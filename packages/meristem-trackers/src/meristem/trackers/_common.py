@@ -27,6 +27,12 @@ def import_or_hint(module: str, *, backend: str, extra: str):
     try:
         return __import__(module, fromlist=["_"])
     except ModuleNotFoundError as exc:
+        top = module.split(".")[0]
+        missing = exc.name or ""
+        # A missing *transitive* dependency should surface as-is, not be reported as the whole
+        # backend library being absent.
+        if missing != top and not missing.startswith(top + "."):
+            raise
         raise ModuleNotFoundError(
             f"the '{backend}' tracking backend requires the '{module}' package, which is not "
             f"installed. Install it with:  pip install 'meristem-trackers[{extra}]'"

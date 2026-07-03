@@ -31,6 +31,13 @@ def import_or_hint(module: str, *, backend: str, extra: str):
     try:
         return __import__(module, fromlist=["_"])
     except ModuleNotFoundError as exc:
+        top = module.split(".")[0]
+        missing = exc.name or ""
+        # Only claim the backend library is absent if the top-level package itself is missing.
+        # If a *transitive* dependency failed to import, surface that real error instead of
+        # misleadingly telling the user to install a package they already have.
+        if missing != top and not missing.startswith(top + "."):
+            raise
         raise ModuleNotFoundError(
             f"the '{backend}' segmentation backend requires the '{module}' package, which is not "
             f"installed. Install it with:  pip install 'meristem-models-cellpose[{extra}]'"
