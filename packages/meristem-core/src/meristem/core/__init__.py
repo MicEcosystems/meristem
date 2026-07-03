@@ -6,9 +6,15 @@ class from application code.
 
 from __future__ import annotations
 
-from .config import BackendConfig, PipelineConfig, ROIConfig, example_config
+from .config import (
+    BackendConfig,
+    ChannelConfig,
+    PipelineConfig,
+    ROIConfig,
+    example_config,
+)
 from .contracts import ImageStack, ROI, SegMasks, TrackGraph
-from .io import ResultBundle, read_image_stack
+from .io import ChannelResult, ResultBundle, read_image_stack
 from .pipeline import run_on_stack, run_pipeline, segment, track
 from .registry import (
     BackendNotFoundError,
@@ -32,10 +38,12 @@ __all__ = [
     # config
     "PipelineConfig",
     "BackendConfig",
+    "ChannelConfig",
     "ROIConfig",
     "example_config",
     # io
     "ResultBundle",
+    "ChannelResult",
     "read_image_stack",
     # pipeline
     "run_pipeline",

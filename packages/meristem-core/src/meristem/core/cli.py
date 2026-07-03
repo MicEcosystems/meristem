@@ -53,11 +53,15 @@ def _cmd_list() -> int:
 def _cmd_run(config_path: Path, *, save: bool) -> int:
     config = PipelineConfig.from_yaml(config_path)
     bundle = run_pipeline(config, save=save)
-    print(
-        f"Done: {bundle.stack.name} — {bundle.masks.n_frames} frames, "
-        f"{bundle.tracks.n_detections} detections, {len(bundle.tracks.divisions())} divisions "
-        f"[segmenter={bundle.segmenter}, tracker={bundle.tracker}]"
-    )
+    print(f"Done [segmenter={bundle.segmenter}, tracker={bundle.tracker}]")
+    for ch in bundle.channels:
+        h, w = ch.stack.shape_yx
+        line = f"  {ch.name}: {ch.stack.n_frames} frames, {h}x{w}"
+        if ch.tracked:
+            line += f", {ch.tracks.n_detections} detections, {len(ch.tracks.divisions())} divisions"
+        else:
+            line += ", segmented only (not tracked)"
+        print(line)
     if save:
         print(f"Results written to: {config.output.dir}")
     return 0

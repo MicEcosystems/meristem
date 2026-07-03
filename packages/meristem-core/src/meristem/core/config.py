@@ -10,10 +10,10 @@ from any particular backend's option set while still being checked.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .contracts import ROI
 
@@ -41,13 +41,60 @@ class BackendConfig(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
 
 
-class InputConfig(BaseModel):
+class ChannelConfig(BaseModel):
+    """One imaging channel plus what to do with it.
+
+    A channel is segmented independently when ``segment`` is set, and its resulting masks are
+    tracked when ``track`` is set. A ``segment=False`` channel is measure-only (carried for future
+    per-cell intensity readout, not segmented). ``track`` requires ``segment`` — you cannot track
+    without masks.
+    """
+
     model_config = {"extra": "forbid"}
 
-    path: str  # OME-TIFF / TIFF stack (T, Y, X), or a glob of per-frame files
+    name: str  # channel label, e.g. "PH", "GFP", "RFP" (must be unique within an input)
+    path: str  # single-channel (T, Y, X) TIFF stack for this channel
+    segment: bool = True
+    track: bool = True
+
+    @model_validator(mode="after")
+    def _track_requires_segment(self) -> "ChannelConfig":
+        if self.track and not self.segment:
+            raise ValueError(
+                f"channel {self.name!r}: track=True requires segment=True (cannot track without masks)"
+            )
+        return self
+
+
+class InputConfig(BaseModel):
+    """The input field of view: either a single stack (``path``) or several ``channels``."""
+
+    model_config = {"extra": "forbid"}
+
+    path: Optional[str] = None  # single-channel shorthand: one (T, Y, X) TIFF
+    name: str = "fov"  # FOV/position name (used for the single-channel shorthand and output prefix)
+    channels: Optional[List[ChannelConfig]] = None  # multi-channel: per-channel files + roles
     pixel_size_um: Optional[float] = None
     frame_interval_s: Optional[float] = None
-    name: str = "fov"
+    max_frames: Optional[int] = Field(default=None, gt=0)  # cap frames read (handy for quick runs)
+
+    @model_validator(mode="after")
+    def _exactly_one_source(self) -> "InputConfig":
+        if bool(self.path) == bool(self.channels):
+            raise ValueError("InputConfig requires exactly one of 'path' or 'channels'")
+        if self.channels is not None:
+            names = [c.name for c in self.channels]
+            if len(names) != len(set(names)):
+                raise ValueError(f"channel names must be unique, got {names}")
+            if not any(c.segment for c in self.channels):
+                raise ValueError("at least one channel must have segment=True")
+        return self
+
+    def resolved_channels(self) -> List[ChannelConfig]:
+        """Normalize to a channel list — the single-channel shorthand becomes one channel."""
+        if self.channels is not None:
+            return self.channels
+        return [ChannelConfig(name=self.name, path=self.path or "", segment=True, track=True)]
 
 
 class OutputConfig(BaseModel):
