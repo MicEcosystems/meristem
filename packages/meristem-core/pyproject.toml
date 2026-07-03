@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "meristem-core"
+version = "0.0.1"
+description = "Modular, model-agnostic core for segmenting and tracking bacterial monolayers in microfluidics."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "meristem contributors" }]
+keywords = ["microscopy", "segmentation", "cell-tracking", "bacteria", "microfluidics"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
+dependencies = [
+    "numpy>=1.23",
+    "pydantic>=2",
+    "networkx>=3",
+    "tifffile>=2023.7.10",
+    "pyyaml>=6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.4"]
+
+# ---------------------------------------------------------------------------
+# Plugin discovery. Backend packages advertise themselves under these entry
+# point groups; meristem.core.registry scans them at import time. The core
+# ships its own mock backends so the pipeline is runnable with zero ML deps.
+# ---------------------------------------------------------------------------
+[project.entry-points."meristem.segmenters"]
+mock = "meristem.core.segmentation.mock:MockSegmenter"
+
+[project.entry-points."meristem.trackers"]
+mock = "meristem.core.tracking.mock:MockTracker"
+
+[project.scripts]
+meristem = "meristem.core.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meristem"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

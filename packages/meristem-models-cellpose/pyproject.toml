@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "meristem-models-cellpose"
+version = "0.0.1"
+description = "Cellpose-SAM and Omnipose segmentation backends for the Meristem pipeline."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "meristem contributors" }]
+keywords = ["cellpose", "omnipose", "segmentation", "bacteria", "microscopy"]
+dependencies = [
+    "meristem-core",
+    "numpy>=1.23",
+]
+
+# Heavy ML frameworks are opt-in so `pip install meristem-models-cellpose` stays light and the
+# backend modules import without them (the model libraries are imported lazily inside load()).
+# Cellpose-SAM ships in cellpose>=4.0; Omnipose brings its own cellpose fork (cellpose-omni).
+[project.optional-dependencies]
+cellpose = ["cellpose>=4.0"]
+omnipose = ["omnipose>=1.0", "cellpose-omni>=1.0"]
+all = ["cellpose>=4.0", "omnipose>=1.0", "cellpose-omni>=1.0"]
+dev = ["pytest>=7", "ruff>=0.4"]
+
+# Both backends advertise themselves to meristem-core's registry. Adding a model to Meristem is
+# exactly this: a package that declares an entry point here — no edit to the core.
+[project.entry-points."meristem.segmenters"]
+cellpose-sam = "meristem.models.cellpose.cellpose_sam:CellposeSAMSegmenter"
+omnipose = "meristem.models.cellpose.omnipose:OmniposeSegmenter"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meristem"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: real model inference; requires the heavy ML library to be installed",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

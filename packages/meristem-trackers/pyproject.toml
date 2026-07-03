@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "meristem-trackers"
+version = "0.0.1"
+description = "Modern cell-tracking backends (Trackastra first) for the Meristem pipeline."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "meristem contributors" }]
+keywords = ["cell-tracking", "lineage", "trackastra", "bacteria", "microscopy"]
+dependencies = [
+    "meristem-core",
+    "numpy>=1.23",
+]
+
+# Heavy tracking libraries are opt-in and imported lazily inside load(); the backends are
+# discoverable and their params introspectable without them installed. Trackastra's ILP mode
+# additionally needs an ILP solver (Gurobi or SCIP) pulled in via its own [ilp] extra.
+[project.optional-dependencies]
+trackastra = ["trackastra>=0.3"]
+trackastra-ilp = ["trackastra[ilp]>=0.3"]
+dev = ["pytest>=7", "ruff>=0.4"]
+
+# Registers with meristem-core's tracker registry. A new tracker = a new package with an entry
+# point here; the core and the napari dropdown pick it up with no code changes.
+[project.entry-points."meristem.trackers"]
+trackastra = "meristem.trackers.trackastra_tracker:TrackastraTracker"
+# S-track is a native pure-NumPy port (no heavy deps), so it works out of the box.
+strack = "meristem.trackers.strack_tracker:STrackTracker"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meristem"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: real model inference; requires the heavy ML library to be installed",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
