@@ -31,14 +31,16 @@ def read_image_stack(
     frame_interval_s: float | None = None,
     name: str = "fov",
     max_frames: int | None = None,
+    frames: range | None = None,
 ) -> ImageStack:
     """Read a single-channel (T, Y, X) TIFF/OME-TIFF into an :class:`ImageStack`.
 
-    A 2D image is promoted to a single-frame stack. ``max_frames`` reads only the first N frames
-    (via ``tifffile`` page keys) — useful for quick runs on very large stacks without loading the
-    whole file. Each imaging channel is read separately; the pipeline handles them per-channel.
+    A 2D image is promoted to a single-frame stack. ``frames`` reads an explicit window (e.g.
+    ``range(5, 40)``) and takes precedence over ``max_frames`` (first N frames) — both use
+    ``tifffile`` page keys to avoid loading the whole file. Each imaging channel is read separately;
+    the pipeline handles them per-channel.
     """
-    key = range(max_frames) if max_frames else None
+    key = frames if frames is not None else (range(max_frames) if max_frames else None)
     arr = tifffile.imread(str(path), key=key)
     if arr.ndim == 2:
         arr = arr[np.newaxis, ...]
@@ -50,6 +52,14 @@ def read_image_stack(
         frame_interval_s=frame_interval_s,
         name=name,
     )
+
+
+def read_masks(path: str | Path, *, source: str = "loaded") -> SegMasks:
+    """Read a previously-saved instance-label mask stack (``{channel}_masks.tif``)."""
+    arr = tifffile.imread(str(path))
+    if arr.ndim == 2:
+        arr = arr[np.newaxis, ...]
+    return SegMasks(data=arr, source=source)
 
 
 @dataclass
