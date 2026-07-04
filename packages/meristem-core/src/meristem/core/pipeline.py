@@ -20,7 +20,7 @@ from .config import BackendConfig, ChannelConfig, PipelineConfig
 from .contracts import ImageStack, SegMasks, TrackGraph
 from .io import ChannelResult, ResultBundle, read_image_stack, read_masks
 from .measure import MeasurementTable, measure_intensities
-from .register import apply_shifts, estimate_drift
+from .register import apply_shifts, crop_with_drift, estimate_drift
 from .registry import get_segmenter, get_tracker
 from .segmentation.base import SegmenterBackend, SegmenterParams
 from .tracking.base import TrackerBackend, TrackerParams
@@ -158,6 +158,8 @@ def _load_stack(
     Registration happens on the full frame *before* cropping, so the crop rectangle stays over the
     same cells across the movie.
     """
+    from dataclasses import replace
+
     stack = read_image_stack(
         ch.path,
         pixel_size_um=config.input.pixel_size_um,
@@ -166,12 +168,16 @@ def _load_stack(
         max_frames=None if frames is not None else config.input.max_frames,
         frames=frames,
     )
+    roi = config.crop.to_roi() if config.crop is not None else None
+    if shifts is not None and roi is not None:
+        # MiDAP-style: move the crop window per frame (no resampling) so it tracks the cells.
+        data = crop_with_drift(stack.data, roi.y, roi.x, roi.height, roi.width, shifts)
+        return replace(stack, data=data)
     if shifts is not None:
-        from dataclasses import replace
-
+        # No crop: resample the whole frame to correct drift.
         stack = replace(stack, data=apply_shifts(stack.data, shifts))
-    if config.crop is not None:
-        stack = stack.crop(config.crop.to_roi())
+    if roi is not None:
+        stack = stack.crop(roi)
     return stack
 
 

@@ -108,7 +108,11 @@ class RegisterConfig(BaseModel):
     model_config = {"extra": "forbid"}
 
     on: str  # channel used to estimate drift (e.g. "PH"); its shifts apply to every channel
-    reference: str = "previous"  # "previous" (accumulate frame-to-frame) or "first" (vs frame 0)
+    # "previous" accumulates frame-to-frame shifts; "first" aligns every frame to frame 0 (MiDAP's
+    # choice). Default is "previous": in a growing monolayer the field decorrelates from frame 0, so
+    # "first" tends to return ~0 drift on this kind of data, whereas consecutive frames stay similar.
+    # Use "first" for static-background / mother-machine data (MiDAP-compatible).
+    reference: str = "previous"
 
     @model_validator(mode="after")
     def _check_reference(self) -> "RegisterConfig":

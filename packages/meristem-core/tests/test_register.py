@@ -13,7 +13,7 @@ from meristem.core import (
     estimate_drift,
     run_segmentation,
 )
-from meristem.core.register import _shift_frame
+from meristem.core.register import _shift_frame, crop_with_drift
 
 
 def _blobby_frame(h=64, w=64, seed=0):
@@ -45,6 +45,26 @@ def test_apply_shifts_realigns_to_reference():
         return np.mean([np.abs(stack[t] - stack[0]).mean() for t in range(1, stack.shape[0])])
 
     assert overlap_err(aligned) < overlap_err(drifted)
+
+
+def test_crop_with_drift_follows_a_moving_object():
+    # A small bright square drifts across frames; a following crop keeps it centered without
+    # resampling (MiDAP's cutout-tracks-the-cells approach).
+    h = w = 60
+    base = np.zeros((h, w), dtype=np.uint16)
+    base[28:32, 28:32] = 255  # 4x4 square centered at (30, 30)
+    drift = [(0, 0), (5, -4), (10, 6)]
+    frames = np.stack([_shift_frame(base, dy, dx) for dy, dx in drift]).astype(np.uint16)
+    shifts = np.array(drift, dtype=float)  # true content drift
+
+    # Crop a 10x10 box originally around the square; it should track the square every frame.
+    cropped = crop_with_drift(frames, y=25, x=25, height=10, width=10, shifts=shifts)
+    assert cropped.shape == (3, 10, 10)
+    for t in range(3):
+        assert cropped[t].max() == 255  # the square is inside the (moved) window every frame
+        # centroid of the bright pixels stays near the window centre across frames
+        ys, xs = np.nonzero(cropped[t])
+        assert 3 <= ys.mean() <= 7 and 3 <= xs.mean() <= 7
 
 
 def test_estimate_drift_requires_3d():

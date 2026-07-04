@@ -1,13 +1,15 @@
-"""Drift registration — correct stage/XY drift before cropping.
+"""Drift registration — correct stage/XY drift.
 
 Long microfluidic time-lapses drift, so a fixed crop rectangle slowly loses the cells it started
 on. This module estimates per-frame translation by FFT phase cross-correlation (pure NumPy, no
-scikit-image) and shifts frames back into alignment. It is applied *before* the manual crop, and
-the drift is estimated on one channel (e.g. PH) and applied identically to every channel, so the
+scikit-image), estimated on one channel (e.g. PH) and applied identically to every channel so the
 fluorescence stays registered to the masks.
 
-Translation only — that covers stage drift, which is overwhelmingly XY shift. Rotation/scale drift
-is out of scope for v1.
+This follows MiDAP's approach (``skimage.registration.phase_cross_correlation`` to the first frame,
+translation only): drift is corrected by **moving the crop window per frame**
+(:func:`crop_with_drift`) so the box tracks the cells — no image resampling or zero-fill artifacts.
+For the (less common) no-crop case, :func:`apply_shifts` resamples the whole frame instead.
+Rotation/scale drift is out of scope for v1.
 """
 
 from __future__ import annotations
@@ -47,8 +49,35 @@ def estimate_drift(images: np.ndarray, reference: Reference = "previous") -> np.
     return shifts
 
 
+def crop_with_drift(
+    images: np.ndarray, y: int, x: int, height: int, width: int, shifts: np.ndarray
+) -> np.ndarray:
+    """Crop a ``(T, Y, X)`` stack with the window following the drift (MiDAP's cutout approach).
+
+    For frame ``t`` the crop origin is offset by that frame's drift, so the fixed-size ``(height,
+    width)`` box tracks the same cells across the movie without resampling the image. Regions that
+    fall outside the frame (only near the image border for large drift) are zero-filled to keep the
+    output size constant.
+    """
+    n, h, w = images.shape
+    out = np.zeros((n, height, width), dtype=images.dtype)
+    for t in range(n):
+        oy = y + int(round(shifts[t, 0]))
+        ox = x + int(round(shifts[t, 1]))
+        sy0, sy1 = max(0, oy), min(h, oy + height)
+        sx0, sx1 = max(0, ox), min(w, ox + width)
+        if sy1 <= sy0 or sx1 <= sx0:
+            continue  # window entirely outside the frame
+        out[t, sy0 - oy : sy1 - oy, sx0 - ox : sx1 - ox] = images[t, sy0:sy1, sx0:sx1]
+    return out
+
+
 def apply_shifts(images: np.ndarray, shifts: np.ndarray) -> np.ndarray:
-    """Align a ``(T, Y, X)`` stack by undoing each frame's drift (integer-pixel, zero-filled)."""
+    """Align a ``(T, Y, X)`` stack by undoing each frame's drift (integer-pixel, zero-filled).
+
+    Used for the no-crop case; when a crop is present, prefer :func:`crop_with_drift`, which moves
+    the crop window instead of resampling the frame.
+    """
     if shifts.shape[0] != images.shape[0]:
         raise ValueError(
             f"shifts ({shifts.shape[0]}) and images ({images.shape[0]}) frame counts differ"
