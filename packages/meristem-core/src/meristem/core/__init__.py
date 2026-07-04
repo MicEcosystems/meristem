@@ -16,6 +16,7 @@ from .config import (
 )
 from .contracts import ImageStack, ROI, SegMasks, TrackGraph
 from .io import ChannelResult, ResultBundle, read_image_stack
+from .measure import CellMeasurement, MeasurementTable, measure_intensities
 from .pipeline import run_on_stack, run_pipeline, segment, track
 from .registry import (
     BackendNotFoundError,
@@ -46,6 +47,10 @@ __all__ = [
     "ResultBundle",
     "ChannelResult",
     "read_image_stack",
+    # measurement
+    "measure_intensities",
+    "MeasurementTable",
+    "CellMeasurement",
     # pipeline
     "run_pipeline",
     "run_on_stack",

@@ -75,6 +75,9 @@ def _cmd_run(config_path: Path, *, save: bool) -> int:
         else:
             line += ", segmented only (not tracked)"
         print(line)
+    if bundle.measurements is not None:
+        m = bundle.measurements
+        print(f"  measured {', '.join(m.channels)} over {len(m.rows)} cell-frames")
     if save:
         print(f"Results written to: {config.output.dir}")
     return 0

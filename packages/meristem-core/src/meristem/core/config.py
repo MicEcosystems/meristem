@@ -55,13 +55,18 @@ class ChannelConfig(BaseModel):
     name: str  # channel label, e.g. "PH", "GFP", "RFP" (must be unique within an input)
     path: str  # single-channel (T, Y, X) TIFF stack for this channel
     segment: bool = True
-    track: bool = True
+    track: bool = False  # opt-in; the single-channel shorthand sets this True explicitly
+    measure: bool = False  # read out per-cell intensity (via the PipelineConfig.measure_on masks)
 
     @model_validator(mode="after")
-    def _track_requires_segment(self) -> "ChannelConfig":
+    def _validate_roles(self) -> "ChannelConfig":
         if self.track and not self.segment:
             raise ValueError(
                 f"channel {self.name!r}: track=True requires segment=True (cannot track without masks)"
+            )
+        if not (self.segment or self.measure):
+            raise ValueError(
+                f"channel {self.name!r}: must have at least one role (segment or measure)"
             )
         return self
 
@@ -115,7 +120,27 @@ class PipelineConfig(BaseModel):
     segmenter: BackendConfig
     tracker: BackendConfig
     crop: Optional[ROIConfig] = None  # manual ROI; None = use the full field of view
+    # Name of the segmented channel whose masks define cells for intensity measurement of the
+    # `measure` channels (e.g. "PH"). Required when any channel has measure=True.
+    measure_on: Optional[str] = None
     output: OutputConfig = Field(default_factory=OutputConfig)
+
+    @model_validator(mode="after")
+    def _validate_measurement(self) -> "PipelineConfig":
+        channels = self.input.resolved_channels()
+        if any(c.measure for c in channels):
+            if not self.measure_on:
+                raise ValueError(
+                    "measure_on is required when any channel has measure=True "
+                    "(name the segmented channel whose masks to measure through, e.g. 'PH')"
+                )
+            segmented = {c.name for c in channels if c.segment}
+            if self.measure_on not in segmented:
+                raise ValueError(
+                    f"measure_on={self.measure_on!r} must name a segmented channel; "
+                    f"segmented channels are {sorted(segmented)}"
+                )
+        return self
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "PipelineConfig":

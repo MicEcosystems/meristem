@@ -14,6 +14,7 @@ from __future__ import annotations
 from .config import BackendConfig, PipelineConfig
 from .contracts import ImageStack, SegMasks, TrackGraph
 from .io import ChannelResult, ResultBundle, read_image_stack
+from .measure import measure_intensities
 from .registry import get_segmenter, get_tracker
 from .segmentation.base import SegmenterBackend, SegmenterParams
 from .tracking.base import TrackerBackend, TrackerParams
@@ -23,14 +24,14 @@ def run_pipeline(config: PipelineConfig, *, save: bool = True) -> ResultBundle:
     """Run the full pipeline described by ``config`` and (optionally) persist the results.
 
     Every channel marked ``segment`` is read, cropped, and segmented independently; those also
-    marked ``track`` are then tracked. Measure-only channels are skipped here (reserved for future
-    per-cell intensity readout).
+    marked ``track`` are then tracked. ``measure`` channels are not segmented — instead their
+    per-cell intensity is read out through the ``measure_on`` channel's masks (and joined to its
+    tracks), producing a measurements table.
     """
     roi = config.crop.to_roi() if config.crop is not None else None
-    results = []
-    for ch in config.input.resolved_channels():
-        if not ch.segment:
-            continue
+    channels = config.input.resolved_channels()
+
+    def load(ch) -> ImageStack:
         stack = read_image_stack(
             ch.path,
             pixel_size_um=config.input.pixel_size_um,
@@ -38,12 +39,34 @@ def run_pipeline(config: PipelineConfig, *, save: bool = True) -> ResultBundle:
             name=ch.name,
             max_frames=config.input.max_frames,
         )
-        if roi is not None:
-            stack = stack.crop(roi)
-        results.append(_process_channel(ch.name, stack, config, do_track=ch.track))
+        return stack.crop(roi) if roi is not None else stack
+
+    results = []
+    result_by_name = {}
+    for ch in channels:
+        if not ch.segment:
+            continue
+        cr = _process_channel(ch.name, load(ch), config, do_track=ch.track)
+        results.append(cr)
+        result_by_name[ch.name] = cr
+
+    measurements = None
+    measure_channels = [c for c in channels if c.measure]
+    if measure_channels:
+        base = result_by_name[config.measure_on]  # validated to be a segmented channel
+        channel_images = {c.name: load(c).data for c in measure_channels}
+        measurements = measure_intensities(
+            base.masks,
+            channel_images,
+            tracks=base.tracks,
+            pixel_size_um=config.input.pixel_size_um,
+        )
 
     bundle = ResultBundle(
-        channels=results, segmenter=config.segmenter.name, tracker=config.tracker.name
+        channels=results,
+        segmenter=config.segmenter.name,
+        tracker=config.tracker.name,
+        measurements=measurements,
     )
     if save:
         bundle.save(
