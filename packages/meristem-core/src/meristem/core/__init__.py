@@ -6,6 +6,7 @@ class from application code.
 
 from __future__ import annotations
 
+from .compare import ComparisonReport, CompareSpec, format_report, run_comparison
 from .config import (
     BackendConfig,
     ChannelConfig,
@@ -50,6 +51,11 @@ __all__ = [
     "run_on_stack",
     "segment",
     "track",
+    # compare
+    "CompareSpec",
+    "ComparisonReport",
+    "run_comparison",
+    "format_report",
     # registry
     "register_segmenter",
     "register_tracker",

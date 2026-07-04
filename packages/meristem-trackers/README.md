@@ -38,6 +38,15 @@ pip install 'meristem-trackers[trackastra-ilp]'   # + globally-optimal ILP mode 
 
 The wrapper itself is dependency-light; Trackastra (and torch) load lazily when the backend runs.
 
+### Device / GPU
+
+Trackastra runs on `cpu` (default), `cuda`, or `mps`. It's a lightweight linker, so **CPU is
+usually fastest at monolayer scale** — on Apple Silicon MPS is often *slower* (partial Metal op
+coverage + transfer overhead), and only large workloads on CUDA clearly benefit. Set
+`tracker.params.device` to choose. When you request `mps`, the backend enables
+`PYTORCH_ENABLE_MPS_FALLBACK` automatically so the GPU is actually used instead of silently falling
+back to CPU.
+
 ## Use
 
 ```python

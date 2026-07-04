@@ -13,6 +13,7 @@ so the result is an ordinary Meristem :class:`~meristem.core.contracts.TrackGrap
 
 from __future__ import annotations
 
+import os
 from typing import Literal
 
 from meristem.core.contracts import ImageStack, SegMasks, TrackGraph
@@ -31,7 +32,11 @@ class TrackastraParams(TrackerParams):
     # Linking strategy: "greedy" (division-aware, fast), "greedy_nodiv" (no divisions), or
     # "ilp" (globally optimal via an ILP solver; requires the [trackastra-ilp] extra).
     mode: Literal["greedy", "greedy_nodiv", "ilp"] = "greedy"
-    device: Device = "auto"
+    # Default to CPU: Trackastra is a lightweight linker, and on typical monolayer-scale inputs CPU
+    # beats MPS (partial Metal op coverage + transfer overhead). Set "cuda" on an NVIDIA box, or
+    # "mps"/"auto" on Apple Silicon for large workloads (we enable the MPS fallback flag below so
+    # the request is actually honored rather than silently dropped to CPU).
+    device: Device = "cpu"
 
 
 class TrackastraTracker(TrackerBackend):
@@ -45,6 +50,10 @@ class TrackastraTracker(TrackerBackend):
         model_mod = import_or_hint("trackastra.model", backend=self.name, extra="trackastra")
         self._tracking = import_or_hint("trackastra.tracking", backend=self.name, extra="trackastra")
         device = select_device(params.device)
+        if device == "mps":
+            # Trackastra only runs on MPS when CPU-fallback for unsupported ops is enabled;
+            # otherwise it silently drops to CPU. Opt in so a requested/auto MPS device is honored.
+            os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
         self._model = model_mod.Trackastra.from_pretrained(params.model_name, device=device)
 
     def track(self, stack: ImageStack, masks: SegMasks) -> TrackGraph:

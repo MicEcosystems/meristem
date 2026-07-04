@@ -33,6 +33,7 @@ def test_params_defaults_and_validation():
     p = TrackastraParams()
     assert p.model_name == "general_2d"
     assert p.mode == "greedy"
+    assert p.device == "cpu"  # CPU by default; fastest for this linker at monolayer scale
     with pytest.raises(Exception):  # invalid mode (not in Literal)
         TrackastraParams(mode="teleport")
     with pytest.raises(Exception):  # unknown key (extra="forbid")

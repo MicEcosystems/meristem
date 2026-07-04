@@ -1,12 +1,13 @@
 """Command-line entry point: ``meristem``.
 
-Two subcommands cover the headless workflow:
+Subcommands cover the headless workflow:
 
     meristem list                     # show installed segmentation & tracking backends
     meristem run experiment.yaml      # run the pipeline described by a config file
+    meristem compare compare.yaml     # run several models on the same input and tabulate them
 
-This is intentionally thin — all logic lives in :mod:`meristem.core.pipeline`. The napari plugin
-is a parallel front-end over the same functions, not a superset.
+This is intentionally thin — all logic lives in :mod:`meristem.core.pipeline` and
+:mod:`meristem.core.compare`. The napari plugin is a parallel front-end over the same functions.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .compare import CompareSpec, format_report, run_comparison
 from .config import PipelineConfig
 from .pipeline import run_pipeline
 from .registry import list_segmenters, list_trackers
@@ -30,14 +32,25 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("config", type=Path, help="path to the experiment YAML config")
     run_p.add_argument("--no-save", action="store_true", help="do not write result files")
 
+    cmp_p = sub.add_parser("compare", help="compare several models on the same input")
+    cmp_p.add_argument("spec", type=Path, help="path to the comparison YAML spec")
+
     args = parser.parse_args(argv)
 
     if args.command == "list":
         return _cmd_list()
     if args.command == "run":
         return _cmd_run(args.config, save=not args.no_save)
+    if args.command == "compare":
+        return _cmd_compare(args.spec)
     parser.error(f"unknown command {args.command!r}")
     return 2
+
+
+def _cmd_compare(spec_path: Path) -> int:
+    report = run_comparison(CompareSpec.from_yaml(spec_path))
+    print(format_report(report))
+    return 0
 
 
 def _cmd_list() -> int:
