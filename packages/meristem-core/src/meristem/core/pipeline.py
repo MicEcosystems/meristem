@@ -14,10 +14,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Tuple
 
+import numpy as np
+
 from .config import BackendConfig, ChannelConfig, PipelineConfig
 from .contracts import ImageStack, SegMasks, TrackGraph
 from .io import ChannelResult, ResultBundle, read_image_stack, read_masks
 from .measure import MeasurementTable, measure_intensities
+from .register import apply_shifts, estimate_drift
 from .registry import get_segmenter, get_tracker
 from .segmentation.base import SegmenterBackend, SegmenterParams
 from .tracking.base import TrackerBackend, TrackerParams
@@ -34,16 +37,19 @@ def run_pipeline(config: PipelineConfig, *, save: bool = True) -> ResultBundle:
     and :func:`run_tracking` instead.
     """
     channels = config.input.resolved_channels()
+    shifts = _estimate_shifts(config, frames=None)
     results = []
     result_by_name = {}
     for ch in channels:
         if not ch.segment:
             continue
-        cr = _process_channel(ch.name, _load_stack(config, ch), config, do_track=ch.track)
+        cr = _process_channel(
+            ch.name, _load_stack(config, ch, shifts=shifts), config, do_track=ch.track
+        )
         results.append(cr)
         result_by_name[ch.name] = cr
 
-    measurements = _measure_channels(config, result_by_name, frames=None)
+    measurements = _measure_channels(config, result_by_name, frames=None, shifts=shifts)
     bundle = ResultBundle(
         channels=results,
         segmenter=config.segmenter.name,
@@ -51,6 +57,7 @@ def run_pipeline(config: PipelineConfig, *, save: bool = True) -> ResultBundle:
         measurements=measurements,
     )
     if save:
+        _save_drift(config, shifts)
         bundle.save(
             config.output.dir,
             save_masks=config.output.save_masks,
@@ -64,19 +71,22 @@ def run_segmentation(config: PipelineConfig, *, save: bool = True) -> ResultBund
     """Stage 1: segment the ``segment`` channels only, and save masks (no tracking).
 
     This is the standalone segmentation step — run it, inspect the masks visually, then decide
-    which frames are worth tracking before running :func:`run_tracking`.
+    which frames are worth tracking before running :func:`run_tracking`. If drift registration is
+    configured, the estimated shifts are saved so the tracking stage aligns identically.
     """
+    shifts = _estimate_shifts(config, frames=None)
     results = []
     for ch in config.input.resolved_channels():
         if not ch.segment:
             continue
-        stack = _load_stack(config, ch)
+        stack = _load_stack(config, ch, shifts=shifts)
         masks = segment(stack, config.segmenter)
         results.append(ChannelResult(name=ch.name, stack=stack, masks=masks, tracks=None))
     bundle = ResultBundle(
         channels=results, segmenter=config.segmenter.name, tracker=config.tracker.name
     )
     if save:
+        _save_drift(config, shifts)
         # Write masks + binary only; there are no tracks yet.
         bundle.save(
             config.output.dir,
@@ -103,6 +113,7 @@ def run_tracking(
     """
     md = Path(masks_dir) if masks_dir else Path(config.output.dir)
     fr = range(*frames) if frames is not None else None
+    shifts = _load_or_estimate_shifts(config, md, fr)
 
     results = []
     result_by_name = {}
@@ -110,14 +121,14 @@ def run_tracking(
         if not ch.segment:
             continue
         masks = _slice_masks(read_masks(md / f"{ch.name}_masks.tif"), fr)
-        stack = _load_stack(config, ch, frames=fr)
+        stack = _load_stack(config, ch, frames=fr, shifts=shifts)
         _check_aligned(ch.name, stack, masks)
         tracks = track(stack, masks, config.tracker) if ch.track else None
         cr = ChannelResult(name=ch.name, stack=stack, masks=masks, tracks=tracks)
         results.append(cr)
         result_by_name[ch.name] = cr
 
-    measurements = _measure_channels(config, result_by_name, frames=fr)
+    measurements = _measure_channels(config, result_by_name, frames=fr, shifts=shifts)
     bundle = ResultBundle(
         channels=results,
         segmenter=config.segmenter.name,
@@ -137,9 +148,16 @@ def run_tracking(
 
 
 def _load_stack(
-    config: PipelineConfig, ch: ChannelConfig, frames: Optional[range] = None
+    config: PipelineConfig,
+    ch: ChannelConfig,
+    frames: Optional[range] = None,
+    shifts: Optional[np.ndarray] = None,
 ) -> ImageStack:
-    """Load one channel's stack with the config's crop, honoring a frame window or max_frames."""
+    """Load one channel's stack, drift-register it (if shifts given), then apply the crop.
+
+    Registration happens on the full frame *before* cropping, so the crop rectangle stays over the
+    same cells across the movie.
+    """
     stack = read_image_stack(
         ch.path,
         pixel_size_um=config.input.pixel_size_um,
@@ -148,13 +166,20 @@ def _load_stack(
         max_frames=None if frames is not None else config.input.max_frames,
         frames=frames,
     )
+    if shifts is not None:
+        from dataclasses import replace
+
+        stack = replace(stack, data=apply_shifts(stack.data, shifts))
     if config.crop is not None:
         stack = stack.crop(config.crop.to_roi())
     return stack
 
 
 def _measure_channels(
-    config: PipelineConfig, result_by_name: dict, frames: Optional[range]
+    config: PipelineConfig,
+    result_by_name: dict,
+    frames: Optional[range],
+    shifts: Optional[np.ndarray] = None,
 ) -> Optional[MeasurementTable]:
     measure_channels = [c for c in config.input.resolved_channels() if c.measure]
     if not measure_channels:
@@ -162,10 +187,55 @@ def _measure_channels(
     base = result_by_name.get(config.measure_on)
     if base is None:  # the measure_on channel wasn't segmented in this run
         return None
-    channel_images = {c.name: _load_stack(config, c, frames=frames).data for c in measure_channels}
+    channel_images = {
+        c.name: _load_stack(config, c, frames=frames, shifts=shifts).data for c in measure_channels
+    }
     return measure_intensities(
         base.masks, channel_images, tracks=base.tracks, pixel_size_um=config.input.pixel_size_um
     )
+
+
+# ---------------------------------------------------------------------------
+# Drift registration helpers
+# ---------------------------------------------------------------------------
+def _estimate_shifts(config: PipelineConfig, frames: Optional[range]) -> Optional[np.ndarray]:
+    """Estimate drift shifts on the register-on channel (uncropped), or None if not configured."""
+    if config.registration is None:
+        return None
+    reg = next(c for c in config.input.resolved_channels() if c.name == config.registration.on)
+    raw = read_image_stack(
+        reg.path,
+        name=reg.name,
+        max_frames=None if frames is not None else config.input.max_frames,
+        frames=frames,
+    )
+    return estimate_drift(raw.data, reference=config.registration.reference)
+
+
+def _drift_path(config: PipelineConfig, out_dir: Path) -> Path:
+    return out_dir / f"{config.registration.on}_drift.npy"
+
+
+def _save_drift(config: PipelineConfig, shifts: Optional[np.ndarray]) -> None:
+    if config.registration is None or shifts is None:
+        return
+    out = Path(config.output.dir)
+    out.mkdir(parents=True, exist_ok=True)
+    np.save(_drift_path(config, out), shifts)
+
+
+def _load_or_estimate_shifts(
+    config: PipelineConfig, masks_dir: Path, frames: Optional[range]
+) -> Optional[np.ndarray]:
+    """For the tracking stage: reuse the drift saved at segmentation (sliced to the window), or
+    re-estimate on the window if it isn't there, so alignment matches the saved masks."""
+    if config.registration is None:
+        return None
+    saved = _drift_path(config, masks_dir)
+    if saved.exists():
+        full = np.load(saved)
+        return full[frames.start : frames.stop] if frames is not None else full
+    return _estimate_shifts(config, frames)
 
 
 def _slice_masks(masks: SegMasks, frames: Optional[range]) -> SegMasks:

@@ -102,6 +102,21 @@ class InputConfig(BaseModel):
         return [ChannelConfig(name=self.name, path=self.path or "", segment=True, track=True)]
 
 
+class RegisterConfig(BaseModel):
+    """Drift-registration settings, applied to all channels before cropping."""
+
+    model_config = {"extra": "forbid"}
+
+    on: str  # channel used to estimate drift (e.g. "PH"); its shifts apply to every channel
+    reference: str = "previous"  # "previous" (accumulate frame-to-frame) or "first" (vs frame 0)
+
+    @model_validator(mode="after")
+    def _check_reference(self) -> "RegisterConfig":
+        if self.reference not in ("previous", "first"):
+            raise ValueError(f"register.reference must be 'previous' or 'first', got {self.reference!r}")
+        return self
+
+
 class OutputConfig(BaseModel):
     model_config = {"extra": "forbid"}
 
@@ -114,16 +129,29 @@ class OutputConfig(BaseModel):
 class PipelineConfig(BaseModel):
     """Top-level experiment description loaded from YAML."""
 
-    model_config = {"extra": "forbid"}
+    model_config = {"extra": "forbid", "populate_by_name": True}
 
     input: InputConfig
     segmenter: BackendConfig
     tracker: BackendConfig
+    # YAML key is `register`; the attribute is `registration` to avoid shadowing ABCMeta.register.
+    registration: Optional[RegisterConfig] = Field(default=None, alias="register")
     crop: Optional[ROIConfig] = None  # manual ROI; None = use the full field of view
     # Name of the segmented channel whose masks define cells for intensity measurement of the
     # `measure` channels (e.g. "PH"). Required when any channel has measure=True.
     measure_on: Optional[str] = None
     output: OutputConfig = Field(default_factory=OutputConfig)
+
+    @model_validator(mode="after")
+    def _validate_register(self) -> "PipelineConfig":
+        if self.registration is not None:
+            names = {c.name for c in self.input.resolved_channels()}
+            if self.registration.on not in names:
+                raise ValueError(
+                    f"register.on={self.registration.on!r} must name an input channel; "
+                    f"have {sorted(names)}"
+                )
+        return self
 
     @model_validator(mode="after")
     def _validate_measurement(self) -> "PipelineConfig":
@@ -150,7 +178,9 @@ class PipelineConfig(BaseModel):
 
     def to_yaml(self, path: str | Path) -> None:
         with open(path, "w") as fh:
-            yaml.safe_dump(self.model_dump(mode="json", exclude_none=True), fh, sort_keys=False)
+            yaml.safe_dump(
+                self.model_dump(mode="json", exclude_none=True, by_alias=True), fh, sort_keys=False
+            )
 
 
 def example_config() -> PipelineConfig:

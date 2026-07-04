@@ -11,12 +11,14 @@ from .config import (
     BackendConfig,
     ChannelConfig,
     PipelineConfig,
+    RegisterConfig,
     ROIConfig,
     example_config,
 )
 from .contracts import ImageStack, ROI, SegMasks, TrackGraph
 from .io import ChannelResult, ResultBundle, read_image_stack
 from .measure import CellMeasurement, MeasurementTable, measure_intensities
+from .register import apply_shifts, estimate_drift
 from .pipeline import (
     run_on_stack,
     run_pipeline,
@@ -48,8 +50,12 @@ __all__ = [
     "PipelineConfig",
     "BackendConfig",
     "ChannelConfig",
+    "RegisterConfig",
     "ROIConfig",
     "example_config",
+    # registration
+    "estimate_drift",
+    "apply_shifts",
     # io
     "ResultBundle",
     "ChannelResult",
