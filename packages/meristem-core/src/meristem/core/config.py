@@ -102,6 +102,16 @@ class InputConfig(BaseModel):
         return [ChannelConfig(name=self.name, path=self.path or "", segment=True, track=True)]
 
 
+class PostprocessConfig(BaseModel):
+    """Size-filter cleanup applied to segmentation masks (MiDAP-style)."""
+
+    model_config = {"extra": "forbid"}
+
+    min_size_frac: float = Field(default=0.01, ge=0)  # drop labels < this * mean area (MiDAP: 0.01)
+    max_size_frac: Optional[float] = Field(default=None, gt=0)  # optional: drop labels > this * mean
+    min_size_px: Optional[int] = Field(default=None, gt=0)  # optional absolute floor in pixels
+
+
 class RegisterConfig(BaseModel):
     """Drift-registration settings, applied to all channels before cropping."""
 
@@ -141,6 +151,7 @@ class PipelineConfig(BaseModel):
     # YAML key is `register`; the attribute is `registration` to avoid shadowing ABCMeta.register.
     registration: Optional[RegisterConfig] = Field(default=None, alias="register")
     crop: Optional[ROIConfig] = None  # manual ROI; None = use the full field of view
+    postprocess: Optional[PostprocessConfig] = None  # size-filter cleanup after segmentation
     # Name of the segmented channel whose masks define cells for intensity measurement of the
     # `measure` channels (e.g. "PH"). Required when any channel has measure=True.
     measure_on: Optional[str] = None

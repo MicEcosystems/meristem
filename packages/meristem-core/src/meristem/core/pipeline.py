@@ -20,6 +20,7 @@ from .config import BackendConfig, ChannelConfig, PipelineConfig
 from .contracts import ImageStack, SegMasks, TrackGraph
 from .io import ChannelResult, ResultBundle, read_image_stack, read_masks
 from .measure import MeasurementTable, measure_intensities
+from .postprocess import filter_by_size
 from .register import apply_shifts, crop_with_drift, estimate_drift
 from .registry import get_segmenter, get_tracker
 from .segmentation.base import SegmenterBackend, SegmenterParams
@@ -80,8 +81,7 @@ def run_segmentation(config: PipelineConfig, *, save: bool = True) -> ResultBund
         if not ch.segment:
             continue
         stack = _load_stack(config, ch, shifts=shifts)
-        masks = segment(stack, config.segmenter)
-        results.append(ChannelResult(name=ch.name, stack=stack, masks=masks, tracks=None))
+        results.append(_process_channel(ch.name, stack, config, do_track=False))
     bundle = ResultBundle(
         channels=results, segmenter=config.segmenter.name, tracker=config.tracker.name
     )
@@ -291,6 +291,13 @@ def _process_channel(
     name: str, stack: ImageStack, config: PipelineConfig, *, do_track: bool
 ) -> ChannelResult:
     masks = segment(stack, config.segmenter)
+    if config.postprocess is not None:
+        masks = filter_by_size(
+            masks,
+            min_size_frac=config.postprocess.min_size_frac,
+            max_size_frac=config.postprocess.max_size_frac,
+            min_size_px=config.postprocess.min_size_px,
+        )
     tracks = track(stack, masks, config.tracker) if do_track else None
     return ChannelResult(name=name, stack=stack, masks=masks, tracks=tracks)
 

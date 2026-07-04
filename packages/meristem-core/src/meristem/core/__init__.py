@@ -11,6 +11,7 @@ from .config import (
     BackendConfig,
     ChannelConfig,
     PipelineConfig,
+    PostprocessConfig,
     RegisterConfig,
     ROIConfig,
     example_config,
@@ -18,6 +19,7 @@ from .config import (
 from .contracts import ImageStack, ROI, SegMasks, TrackGraph
 from .io import ChannelResult, ResultBundle, read_image_stack
 from .measure import CellMeasurement, MeasurementTable, measure_intensities
+from .postprocess import filter_by_size
 from .register import apply_shifts, crop_with_drift, estimate_drift
 from .pipeline import (
     run_on_stack,
@@ -51,12 +53,15 @@ __all__ = [
     "BackendConfig",
     "ChannelConfig",
     "RegisterConfig",
+    "PostprocessConfig",
     "ROIConfig",
     "example_config",
     # registration
     "estimate_drift",
     "apply_shifts",
     "crop_with_drift",
+    # postprocess
+    "filter_by_size",
     # io
     "ResultBundle",
     "ChannelResult",
