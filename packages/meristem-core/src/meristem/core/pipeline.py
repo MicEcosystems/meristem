@@ -49,6 +49,7 @@ def run_pipeline(config: PipelineConfig, *, save: bool = True) -> ResultBundle:
         bundle.save(
             config.output.dir,
             save_masks=config.output.save_masks,
+            save_binary=config.output.save_binary,
             save_tracks=config.output.save_tracks,
         )
     return bundle

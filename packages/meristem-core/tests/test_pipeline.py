@@ -97,6 +97,29 @@ def test_full_run_pipeline_writes_result_bundle(tmp_path, dividing_stack: ImageS
     assert tracks.ndim == 2 and tracks.shape[1] == 4
 
 
+def test_binary_mask_export_matches_instance_foreground(tmp_path, dividing_stack: ImageStack):
+    # MiDAP parity: alongside instance labels, a 0/255 binary foreground is written and equals
+    # (instance_masks > 0). Instance labels remain the primary, tracked representation.
+    import tifffile
+
+    stack_path = tmp_path / "stack.tif"
+    tifffile.imwrite(str(stack_path), dividing_stack.data)
+    out_dir = tmp_path / "results"
+    cfg = _mock_config(
+        input={"path": str(stack_path), "name": "synthetic"},
+        output={"dir": str(out_dir)},
+    )
+    bundle = run_pipeline(cfg, save=True)
+
+    manifest = json.loads((out_dir / "manifest.json").read_text())
+    files = manifest["channels"][0]["files"]
+    assert "binary" in files
+    binary = tifffile.imread(out_dir / files["binary"])
+    labels = bundle.channel("synthetic").masks.data
+    assert set(np.unique(binary)).issubset({0, 255})
+    assert np.array_equal(binary > 0, labels > 0)  # binary is exactly the instance foreground
+
+
 def test_multichannel_per_channel_segment_and_selective_track(tmp_path, dividing_stack: ImageStack):
     # Two channels: both segmented, but only one tracked — the per-channel roles in action.
     import tifffile

@@ -79,14 +79,23 @@ class ResultBundle:
                 return ch
         raise KeyError(f"no channel named {name!r}; have {[c.name for c in self.channels]}")
 
-    def save(self, out_dir: str | Path, *, save_masks: bool = True, save_tracks: bool = True) -> Path:
+    def save(
+        self,
+        out_dir: str | Path,
+        *,
+        save_masks: bool = True,
+        save_binary: bool = True,
+        save_tracks: bool = True,
+    ) -> Path:
         out = Path(out_dir)
         out.mkdir(parents=True, exist_ok=True)
         manifest: dict = {
             "segmenter": self.segmenter,
             "tracker": self.tracker,
             "channels": [
-                self._save_channel(ch, out, save_masks=save_masks, save_tracks=save_tracks)
+                self._save_channel(
+                    ch, out, save_masks=save_masks, save_binary=save_binary, save_tracks=save_tracks
+                )
                 for ch in self.channels
             ],
         }
@@ -96,7 +105,7 @@ class ResultBundle:
         return manifest_path
 
     def _save_channel(
-        self, ch: ChannelResult, out: Path, *, save_masks: bool, save_tracks: bool
+        self, ch: ChannelResult, out: Path, *, save_masks: bool, save_binary: bool, save_tracks: bool
     ) -> dict:
         prefix = ch.name
         entry: dict = {
@@ -112,6 +121,13 @@ class ResultBundle:
             mask_path = out / f"{prefix}_masks.tif"
             tifffile.imwrite(str(mask_path), ch.masks.data)
             entry["files"]["masks"] = mask_path.name
+
+        if save_binary:
+            # Foreground derived from the instance labels (MiDAP's _seg_bin), 0/255 uint8.
+            binary = (ch.masks.data > 0).astype(np.uint8) * 255
+            binary_path = out / f"{prefix}_seg_bin.tif"
+            tifffile.imwrite(str(binary_path), binary)
+            entry["files"]["binary"] = binary_path.name
 
         if save_tracks and ch.tracks is not None:
             data, graph = ch.tracks.to_napari_tracks()

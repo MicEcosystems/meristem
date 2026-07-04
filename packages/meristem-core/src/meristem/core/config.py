@@ -101,7 +101,8 @@ class OutputConfig(BaseModel):
     model_config = {"extra": "forbid"}
 
     dir: str = "results"
-    save_masks: bool = True
+    save_masks: bool = True  # instance-labeled masks (the primary output), as uint16 TIFF
+    save_binary: bool = True  # also write a 0/255 binary foreground TIFF (MiDAP's _seg_bin parity)
     save_tracks: bool = True  # writes napari-tracks .npy + CTC res_track.txt
 
 
