@@ -87,6 +87,15 @@ def test_trackgraph_from_napari_empty():
     assert tg.n_detections == 0
 
 
+def test_trackgraph_from_napari_accepts_scalar_parent():
+    # Trackastra's graph_to_napari_tracks maps child -> a single parent int (not a list); the
+    # converter must accept that as well as napari's own child -> [parents] form.
+    data, _ = _synthetic_division()
+    tg = trackgraph_from_napari(data, {2: 1, 3: 1})  # scalar parents
+    assert len(tg.divisions()) == 1
+    assert tg.n_detections == 6
+
+
 @pytest.mark.slow
 def test_trackastra_real_tracking_if_available():
     pytest.importorskip("trackastra")

@@ -12,7 +12,7 @@ conversion logic lives here rather than inside a specific backend.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Dict, List, Sequence
+from typing import Dict, List, Union
 
 import numpy as np
 
@@ -40,7 +40,7 @@ def import_or_hint(module: str, *, backend: str, extra: str):
 
 
 def trackgraph_from_napari(
-    data: np.ndarray, division_graph: Dict[int, Sequence[int]]
+    data: np.ndarray, division_graph: Dict[int, Union[int, "list[int]"]]
 ) -> TrackGraph:
     """Build a :class:`TrackGraph` from napari Tracks data plus a division graph.
 
@@ -76,14 +76,23 @@ def trackgraph_from_napari(
             tg.link(parent, child)
 
     # Division links: last detection of the parent track -> first detection of each child track.
+    # napari's own Tracks graph maps child -> [parents], but some producers (e.g. Trackastra's
+    # graph_to_napari_tracks) map child -> a single parent int. Accept both.
     for child_track, parents in division_graph.items():
         child_nodes = track_nodes.get(int(child_track))
         if not child_nodes:
             continue
         child_first = child_nodes[0]
-        for parent_track in parents:
+        for parent_track in _as_parent_list(parents):
             parent_nodes = track_nodes.get(int(parent_track))
             if parent_nodes:
                 tg.link(parent_nodes[-1], child_first)
 
     return tg
+
+
+def _as_parent_list(parents) -> List[int]:
+    """Normalize a division-graph value to a list of parent track ids (scalar or iterable)."""
+    if isinstance(parents, (int, np.integer)):
+        return [int(parents)]
+    return [int(p) for p in parents]
