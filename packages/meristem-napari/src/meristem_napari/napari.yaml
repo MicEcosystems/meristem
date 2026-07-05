@@ -5,6 +5,9 @@ contributions:
     - id: meristem-napari.read_channel
       title: Read a channel TIFF stack
       python_name: meristem_napari._reader:napari_get_reader
+    - id: meristem-napari.run
+      title: Run pipeline (segment + track)
+      python_name: meristem_napari._widgets:run_widget
     - id: meristem-napari.segment
       title: Segment (stage 1)
       python_name: meristem_napari._widgets:segment_widget
@@ -16,6 +19,8 @@ contributions:
       accepts_directories: false
       filename_patterns: ["*.tif", "*.tiff"]
   widgets:
+    - command: meristem-napari.run
+      display_name: "Run pipeline"
     - command: meristem-napari.segment
       display_name: "1. Segment"
     - command: meristem-napari.track

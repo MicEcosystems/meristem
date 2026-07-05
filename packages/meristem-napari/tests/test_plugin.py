@@ -14,6 +14,7 @@ from meristem_napari._core import (
     params_for_segmenter,
     params_for_tracker,
     roi_from_rectangle,
+    segment_and_track_to_layers,
     segment_to_layer,
     segmenter_choices,
     to_tyx,
@@ -108,12 +109,34 @@ def test_track_to_layer_frame_window():
     assert set(np.unique(data[:, 1]).astype(int)) <= {0, 1, 2}  # 3-frame window, local indices
 
 
+def test_one_click_run_produces_masks_and_tracks():
+    # The launcher's "Run" does segment + track in one call and returns both layers.
+    img = np.zeros((3, 40, 40), dtype=np.float32)
+    img[:, 12:20, 12:20] = 1.0
+    layers = segment_and_track_to_layers(img, "PH", "mock", "strack", register=False)
+    kinds = [ltype for _, _, ltype in layers]
+    assert kinds == ["labels", "tracks"]
+    assert layers[0][0].shape == (3, 40, 40)  # masks
+    assert layers[1][0].shape[1] == 4  # tracks [track_id, t, y, x]
+
+
+def test_one_click_run_with_crop_and_register():
+    img = np.zeros((3, 60, 60), dtype=np.float32)
+    img[:, 20:30, 20:30] = 1.0
+    rect = np.array([[15, 15], [15, 45], [45, 45], [45, 15]], dtype=float)
+    layers = segment_and_track_to_layers(
+        img, "PH", "mock", "strack", crop_rect=rect, register=True
+    )
+    assert layers[0][0].shape == (3, 30, 30)  # cropped masks
+
+
 @pytest.mark.skipif(
     importlib.util.find_spec("magicgui") is None, reason="magicgui/napari not installed"
 )
 def test_widgets_construct():
     # Only runs where the GUI stack is present; confirms the factories build a widget.
-    from meristem_napari._widgets import segment_widget, track_widget
+    from meristem_napari._widgets import run_widget, segment_widget, track_widget
 
+    assert run_widget() is not None
     assert segment_widget() is not None
     assert track_widget() is not None

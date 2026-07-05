@@ -11,6 +11,32 @@ segmentation model and a tracker **by name**, and swapping either is a one-line 
 
 ---
 
+## 0. For biologists — the 3-line start
+
+No YAML, no terminal beyond three commands. In a fresh Python 3.11 environment:
+
+```bash
+python -m venv meristem-env && source meristem-env/bin/activate   # (1) make + activate an env
+pip install 'meristem-napari[all]'                               # (2) install GUI + models
+meristem-gui                                                     # (3) launch
+```
+
+napari opens with a **Run pipeline** panel already docked. Then:
+
+1. **Drag your image** (a TIFF stack) into the napari window.
+2. Pick a **Segmentation model** and a **Tracker** from the dropdowns.
+3. *(optional)* Add a **Shapes** layer, draw a rectangle to crop; leave **correct drift** ticked.
+4. Press **Run ▶**.
+
+Masks and tracks appear as layers you can scroll through. That's it — the dropdowns do the rest.
+For the segment-then-inspect-then-track workflow, use the **1. Segment** / **2. Track** panels below
+it. Everything past this point is for scripting and batch runs.
+
+> Model weights download on first run (Cellpose-SAM ~1.15 GB), so the first segmentation is slow;
+> after that they're cached. On Apple Silicon the GPU (MPS) is used automatically.
+
+---
+
 ## 1. Installation
 
 Meristem is five packages. The core is dependency-light (NumPy/Pydantic/networkx/tifffile) and runs

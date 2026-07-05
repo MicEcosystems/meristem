@@ -3,13 +3,22 @@
 A [napari](https://napari.org) plugin for the [Meristem](../../README.md) pipeline — the interactive
 home for the *crop → segment → inspect → track* workflow.
 
-Two dock widgets mirror the CLI stages:
+Three dock widgets:
 
-1. **Segment** — choose a segmentation backend from a dropdown (populated from the registry), draw
-   the crop as a rectangle on a Shapes layer, and run it. The masks appear as a Labels layer you can
-   scroll through and evaluate.
+0. **Run pipeline** — the one-click, no-YAML entry point: pick a segmentation model and a tracker
+   from dropdowns, (optionally) draw a crop rectangle, press Run. Masks + tracks appear as layers.
+1. **Segment** — segment only, into a Labels layer you can scroll through and evaluate.
 2. **Track + measure** — once the segmentation looks good, pick a tracker and a frame window and
    link the masks; the lineage appears as a Tracks layer.
+
+## For biologists
+
+```bash
+pip install 'meristem-napari[all]'   # GUI + real segmentation/tracking models
+meristem-gui                         # opens napari with the Run panel docked
+```
+
+Then drag in a TIFF, pick the dropdowns, press Run.
 
 Both widgets are thin front-ends over `meristem.core` — the same functions the CLI uses — so the GUI
 and headless runs behave identically.

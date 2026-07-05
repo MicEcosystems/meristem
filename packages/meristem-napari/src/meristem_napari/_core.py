@@ -22,6 +22,7 @@ from meristem.core import (
     list_segmenters,
     list_trackers,
 )
+from meristem.core import apply_shifts, crop_with_drift, estimate_drift
 from meristem.core.pipeline import segment as core_segment
 from meristem.core.pipeline import track as core_track
 
@@ -120,3 +121,44 @@ def track_to_layer(
     data, graph = tg.to_napari_tracks()
     meta = {"name": f"{name}_tracks ({tracker})", "graph": graph, "tail_length": 10}
     return (data, meta, "tracks")
+
+
+def segment_and_track_to_layers(
+    image_data: np.ndarray,
+    name: str,
+    segmenter: str,
+    tracker: str,
+    *,
+    device: str = "auto",
+    crop_rect: Optional[np.ndarray] = None,
+    register: bool = False,
+) -> List[LayerDataTuple]:
+    """The whole thing in one call: (optional register) -> (optional crop) -> segment -> track.
+
+    Returns a Labels layer and a Tracks layer. This is what the one-click launcher runs, so a
+    biologist never touches YAML — pick a segmenter and tracker, press Run.
+    """
+    data = to_tyx(image_data)
+    shifts = estimate_drift(data) if (register and data.shape[0] > 1) else None
+
+    if crop_rect is not None:
+        roi = roi_from_rectangle(crop_rect, data.shape[-2:])
+        if shifts is not None:
+            data = crop_with_drift(data, roi.y, roi.x, roi.height, roi.width, shifts)
+        else:
+            data = data[:, roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
+    elif shifts is not None:
+        data = apply_shifts(data, shifts)
+
+    stack = ImageStack(data=data, name=name)
+    masks = core_segment(
+        stack, BackendConfig(name=segmenter, params=params_for_segmenter(segmenter, device=device))
+    )
+    tg = core_track(
+        stack, masks, BackendConfig(name=tracker, params=params_for_tracker(tracker, device="cpu"))
+    )
+    tdata, graph = tg.to_napari_tracks()
+    return [
+        (masks.data, {"name": f"{name}_masks ({segmenter})"}, "labels"),
+        (tdata, {"name": f"{name}_tracks ({tracker})", "graph": graph, "tail_length": 10}, "tracks"),
+    ]

@@ -21,7 +21,18 @@ dependencies = [
 # napari + magicgui are the GUI runtime; kept optional so the package (and its non-GUI helpers)
 # import without a Qt stack present.
 gui = ["napari[all]>=0.4.19", "magicgui>=0.7"]
+# One-line install for biologists: the GUI plus the real segmentation/tracking models.
+all = [
+    "napari[all]>=0.4.19",
+    "magicgui>=0.7",
+    "meristem-models-cellpose[cellpose,omnipose]",
+    "meristem-trackers[trackastra]",
+]
 dev = ["pytest>=7", "ruff>=0.4", "pyyaml>=6"]
+
+# One command launches napari with the guided panel already docked.
+[project.scripts]
+meristem-gui = "meristem_napari._launcher:main"
 
 # npe2 discovers the plugin through this entry point -> the static manifest.
 [project.entry-points."napari.manifest"]

@@ -13,11 +13,38 @@ import napari
 from magicgui import magic_factory
 
 from ._core import (
+    segment_and_track_to_layers,
     segment_to_layer,
     segmenter_choices,
     track_to_layer,
     tracker_choices,
 )
+
+
+@magic_factory(
+    call_button="Run  ▶",
+    segmenter={"choices": segmenter_choices, "label": "Segmentation model"},
+    tracker={"choices": tracker_choices, "label": "Tracker"},
+    device={"choices": ["auto", "cpu", "cuda", "mps"]},
+    register={"label": "correct drift"},
+)
+def run_widget(
+    image: "napari.layers.Image",
+    segmenter: str = "cellpose-sam",
+    tracker: str = "strack",
+    device: str = "auto",
+    register: bool = True,
+    crop: "napari.layers.Shapes" = None,
+) -> "napari.types.LayerDataTuple":
+    """One-click: pick a segmenter and tracker, press Run. Adds masks + tracks layers.
+
+    This is the guided, no-YAML entry point — the MiDAP-style "the dropdowns do the rest".
+    """
+    crop_rect = crop.data[0] if (crop is not None and len(crop.data)) else None
+    return segment_and_track_to_layers(
+        image.data, image.name, segmenter, tracker,
+        device=device, crop_rect=crop_rect, register=register,
+    )
 
 
 @magic_factory(
