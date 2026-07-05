@@ -13,13 +13,20 @@ segmentation model and a tracker **by name**, and swapping either is a one-line 
 
 ## 0. For biologists — the 3-line start
 
-No YAML, no terminal beyond three commands. In a fresh Python 3.11 environment:
+No YAML. In a fresh Python 3.11 environment, from the project folder:
 
 ```bash
-python -m venv meristem-env && source meristem-env/bin/activate   # (1) make + activate an env
-pip install 'meristem-napari[all]'                               # (2) install GUI + models
-meristem-gui                                                     # (3) launch
+python3.11 -m venv meristem-env && source meristem-env/bin/activate   # make + activate an env
+cd path/to/Phusion                                                   # the folder with packages/
+pip install -e packages/meristem-core \
+            -e 'packages/meristem-models-cellpose[cellpose]' \
+            -e 'packages/meristem-trackers[trackastra]' \
+            -e 'packages/meristem-napari[gui]'
+meristem-gui                                                         # launch
 ```
+
+> Once the packages are published to PyPI this collapses to one line —
+> `pip install 'meristem-napari[all]'` — but today they install from these local folders.
 
 napari opens with a **Run pipeline** panel already docked. Then:
 

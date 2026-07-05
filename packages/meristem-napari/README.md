@@ -13,12 +13,18 @@ Three dock widgets:
 
 ## For biologists
 
+From the project folder, in a Python 3.11 env:
+
 ```bash
-pip install 'meristem-napari[all]'   # GUI + real segmentation/tracking models
+pip install -e packages/meristem-core \
+            -e 'packages/meristem-models-cellpose[cellpose]' \
+            -e 'packages/meristem-trackers[trackastra]' \
+            -e 'packages/meristem-napari[gui]'
 meristem-gui                         # opens napari with the Run panel docked
 ```
 
-Then drag in a TIFF, pick the dropdowns, press Run.
+Then drag in a TIFF, pick the dropdowns, press Run. (Once published to PyPI this becomes the
+one-liner `pip install 'meristem-napari[all]'`.)
 
 Both widgets are thin front-ends over `meristem.core` — the same functions the CLI uses — so the GUI
 and headless runs behave identically.
