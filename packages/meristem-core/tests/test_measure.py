@@ -133,6 +133,36 @@ def test_track_summary_one_row_per_track(tmp_path, dividing_stack: ImageStack):
     assert manifest["track_summary"]["n_tracks"] == len(rows)
 
 
+def test_ph_only_run_gets_area_measurements_and_summary(tmp_path, dividing_stack: ImageStack):
+    # No fluorescence channels at all: a single tracked stack must still yield per-cell area
+    # measurements and a per-track summary (mask-only growth/lineage analysis).
+    import csv
+
+    from meristem.core import run_pipeline
+
+    p = tmp_path / "PH.tif"
+    tifffile.imwrite(str(p), dividing_stack.data)
+    out_dir = tmp_path / "out"
+    cfg = PipelineConfig(
+        input={"path": str(p), "name": "PH", "pixel_size_um": 0.065, "frame_interval_s": 300.0},
+        segmenter=BackendConfig(name="mock", params={"threshold": 0.5}),
+        tracker=BackendConfig(name="strack"),
+        output={"dir": str(out_dir)},
+    )
+    bundle = run_pipeline(cfg, save=True)
+
+    assert bundle.measurements is not None and bundle.measurements.channels == []  # area only
+    assert bundle.track_summary is not None
+    rows = list(csv.DictReader(open(out_dir / "track_summary.csv")))
+    assert rows
+    cols = set(rows[0])
+    assert {"track_id", "area_mean_px", "growth_rate_per_hr"} <= cols
+    assert not any(c.endswith("_mean") and c not in ("area_mean_px",) for c in cols)  # no intensity cols
+    # Per-cell area table exists too.
+    mrows = list(csv.DictReader(open(out_dir / "measurements.csv")))
+    assert mrows and "area_px" in mrows[0]
+
+
 def test_measure_requires_measure_on(tmp_path):
     # A measure channel without measure_on must be rejected at config time.
     with pytest.raises(Exception, match="measure_on"):

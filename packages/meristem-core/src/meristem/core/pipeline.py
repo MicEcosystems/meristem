@@ -183,17 +183,27 @@ def _load_stack(
     return stack
 
 
+def _base_channel(config: PipelineConfig, result_by_name: dict):
+    """The channel whose masks anchor measurement/summary: explicit ``measure_on``, else the first
+    tracked channel (so a PH-only run still yields per-cell areas and a per-track summary)."""
+    if config.measure_on is not None:
+        return result_by_name.get(config.measure_on)
+    return next((r for r in result_by_name.values() if r.tracks is not None), None)
+
+
 def _measure_channels(
     config: PipelineConfig,
     result_by_name: dict,
     frames: Optional[range],
     shifts: Optional[np.ndarray] = None,
 ) -> Optional[MeasurementTable]:
-    measure_channels = [c for c in config.input.resolved_channels() if c.measure]
-    if not measure_channels:
+    base = _base_channel(config, result_by_name)
+    if base is None:
         return None
-    base = result_by_name.get(config.measure_on)
-    if base is None:  # the measure_on channel wasn't segmented in this run
+    measure_channels = [c for c in config.input.resolved_channels() if c.measure]
+    # Measure when there are fluorescence channels to read, OR when the base is tracked (so a
+    # PH-only run still gets per-cell area/centroid + a per-track summary; intensities are empty).
+    if not measure_channels and base.tracks is None:
         return None
     channel_images = {
         c.name: _load_stack(config, c, frames=frames, shifts=shifts).data for c in measure_channels
@@ -209,7 +219,7 @@ def _summarize(
     """Collapse the per-cell measurements into one row per track (needs measurements + tracks)."""
     if measurements is None:
         return None
-    base = result_by_name.get(config.measure_on)
+    base = _base_channel(config, result_by_name)
     if base is None or base.tracks is None:
         return None
     return summarize_tracks(
