@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "meristem-napari"
+version = "0.0.1"
+description = "napari plugin for the Meristem pipeline: crop, segment, inspect, then track."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "meristem contributors" }]
+keywords = ["napari", "segmentation", "cell-tracking", "bacteria"]
+classifiers = ["Framework :: napari"]
+dependencies = [
+    "meristem-core",
+    "numpy>=1.23",
+]
+
+[project.optional-dependencies]
+# napari + magicgui are the GUI runtime; kept optional so the package (and its non-GUI helpers)
+# import without a Qt stack present.
+gui = ["napari[all]>=0.4.19", "magicgui>=0.7"]
+dev = ["pytest>=7", "ruff>=0.4", "pyyaml>=6"]
+
+# npe2 discovers the plugin through this entry point -> the static manifest.
+[project.entry-points."napari.manifest"]
+meristem-napari = "meristem_napari:napari.yaml"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meristem_napari"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/meristem_napari/napari.yaml" = "meristem_napari/napari.yaml"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"

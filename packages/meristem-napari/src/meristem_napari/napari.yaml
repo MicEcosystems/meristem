@@ -1,0 +1,22 @@
+name: meristem-napari
+display_name: Meristem
+contributions:
+  commands:
+    - id: meristem-napari.read_channel
+      title: Read a channel TIFF stack
+      python_name: meristem_napari._reader:napari_get_reader
+    - id: meristem-napari.segment
+      title: Segment (stage 1)
+      python_name: meristem_napari._widgets:segment_widget
+    - id: meristem-napari.track
+      title: Track + measure (stage 2)
+      python_name: meristem_napari._widgets:track_widget
+  readers:
+    - command: meristem-napari.read_channel
+      accepts_directories: false
+      filename_patterns: ["*.tif", "*.tiff"]
+  widgets:
+    - command: meristem-napari.segment
+      display_name: "1. Segment"
+    - command: meristem-napari.track
+      display_name: "2. Track + measure"
