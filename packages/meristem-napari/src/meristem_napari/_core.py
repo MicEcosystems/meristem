@@ -7,11 +7,25 @@ widgets in ``_widgets`` import napari/magicgui and delegate the real work to the
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from meristem.core import ROI, get_segmenter, get_tracker, list_segmenters, list_trackers
+from meristem.core import (
+    ROI,
+    BackendConfig,
+    ImageStack,
+    SegMasks,
+    filter_by_size,
+    get_segmenter,
+    get_tracker,
+    list_segmenters,
+    list_trackers,
+)
+from meristem.core.pipeline import segment as core_segment
+from meristem.core.pipeline import track as core_track
+
+LayerDataTuple = Tuple[np.ndarray, dict, str]
 
 
 def segmenter_choices(*_args) -> List[str]:
@@ -61,3 +75,48 @@ def roi_from_rectangle(rectangle: np.ndarray, image_shape_yx) -> ROI:
     y0, x0 = max(0, y0), max(0, x0)
     y1, x1 = min(max_y, y1), min(max_x, x1)
     return ROI(y=y0, x=x0, height=max(1, y1 - y0), width=max(1, x1 - x0))
+
+
+# ---------------------------------------------------------------------------
+# The actual work behind each widget — napari-free, so it is fully unit-testable
+# ---------------------------------------------------------------------------
+def segment_to_layer(
+    image_data: np.ndarray,
+    name: str,
+    segmenter: str,
+    *,
+    device: str = "auto",
+    min_size_frac: float = 0.0,
+    crop_rect: Optional[np.ndarray] = None,
+) -> LayerDataTuple:
+    """Segment an image array (optionally cropped) -> a napari Labels LayerDataTuple."""
+    stack = ImageStack(data=to_tyx(image_data), name=name)
+    if crop_rect is not None:
+        stack = stack.crop(roi_from_rectangle(crop_rect, stack.shape_yx))
+    params = params_for_segmenter(segmenter, device=device)
+    masks = core_segment(stack, BackendConfig(name=segmenter, params=params))
+    if min_size_frac > 0:
+        masks = filter_by_size(masks, min_size_frac=min_size_frac)
+    return (masks.data, {"name": f"{name}_masks ({segmenter})"}, "labels")
+
+
+def track_to_layer(
+    mask_data: np.ndarray,
+    image_data: np.ndarray,
+    name: str,
+    tracker: str,
+    *,
+    frame_start: int = 0,
+    frame_stop: int = 0,
+) -> LayerDataTuple:
+    """Track a mask array over [start, stop) -> a napari Tracks LayerDataTuple."""
+    marr, iarr = to_tyx(mask_data), to_tyx(image_data)
+    stop = frame_stop or marr.shape[0]
+    marr, iarr = marr[frame_start:stop], iarr[frame_start:stop]
+    stack = ImageStack(data=iarr, name=name)
+    seg = SegMasks(data=marr.astype("int32"), source=name)
+    params = params_for_tracker(tracker, device="cpu")
+    tg = core_track(stack, seg, BackendConfig(name=tracker, params=params))
+    data, graph = tg.to_napari_tracks()
+    meta = {"name": f"{name}_tracks ({tracker})", "graph": graph, "tail_length": 10}
+    return (data, meta, "tracks")

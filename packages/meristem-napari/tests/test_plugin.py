@@ -14,8 +14,10 @@ from meristem_napari._core import (
     params_for_segmenter,
     params_for_tracker,
     roi_from_rectangle,
+    segment_to_layer,
     segmenter_choices,
     to_tyx,
+    track_to_layer,
     tracker_choices,
 )
 
@@ -68,6 +70,42 @@ def test_roi_from_rectangle_bounding_box():
     big = np.array([[-5, -5], [-5, 200], [200, 200], [200, -5]], dtype=float)
     roi2 = roi_from_rectangle(big, image_shape_yx=(50, 50))
     assert (roi2.y, roi2.x, roi2.height, roi2.width) == (0, 0, 50, 50)
+
+
+def test_segment_to_layer_produces_labels():
+    # The segment widget's actual work, exercised without napari.
+    img = np.zeros((3, 40, 40), dtype=np.float32)
+    img[:, 10:20, 10:20] = 1.0  # a bright block
+    data, meta, ltype = segment_to_layer(img, "PH", "mock", min_size_frac=0.0)
+    assert ltype == "labels"
+    assert data.shape == (3, 40, 40)
+    assert data.max() >= 1  # something segmented
+    assert "mock" in meta["name"]
+
+
+def test_segment_to_layer_honors_crop_rect():
+    img = np.zeros((2, 50, 50), dtype=np.float32)
+    rect = np.array([[10, 10], [10, 30], [35, 30], [35, 10]], dtype=float)  # 25x20 box
+    data, _, _ = segment_to_layer(img, "PH", "mock", crop_rect=rect)
+    assert data.shape == (2, 25, 20)  # cropped before segmentation
+
+
+def test_track_to_layer_produces_tracks():
+    labels = np.zeros((3, 40, 40), dtype=np.int32)
+    labels[:, 10:16, 10:16] = 1  # one persistent cell
+    img = labels.astype("float32")
+    data, meta, ltype = track_to_layer(labels, img, "PH", "strack")
+    assert ltype == "tracks"
+    assert data.shape[1] == 4  # [track_id, t, y, x]
+    assert "graph" in meta
+
+
+def test_track_to_layer_frame_window():
+    labels = np.zeros((5, 40, 40), dtype=np.int32)
+    labels[:, 10:16, 10:16] = 1
+    data, _, _ = track_to_layer(labels, labels.astype("float32"), "PH", "strack",
+                                frame_start=1, frame_stop=4)
+    assert set(np.unique(data[:, 1]).astype(int)) <= {0, 1, 2}  # 3-frame window, local indices
 
 
 @pytest.mark.skipif(
