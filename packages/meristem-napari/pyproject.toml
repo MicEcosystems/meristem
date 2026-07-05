@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meristem-napari"
-version = "0.0.1"
+version = "1.0.0"
 description = "napari plugin for the Meristem pipeline: crop, segment, inspect, then track."
 readme = "README.md"
 requires-python = ">=3.9"

@@ -17,24 +17,24 @@ reconstruct their genealogies. Meristem is a ground-up successor to
    runs headlessly (CLI / notebook / cluster). Foundation and classic models live in separate
    backend packages; a napari plugin sits on top for interactive work.
 
+**→ Full usage guide: [docs/MANUAL.md](docs/MANUAL.md)**
+
 ## Repository layout
 
 ```
 packages/
   meristem-core/            # contracts, registry, pipeline, mocks (no ML deps)
-  meristem-models-cellpose/ # Cellpose-SAM + Omnipose backends
-  meristem-models-microsam/ # SAM2 / micro-sam backends                   (planned)
-  meristem-models-classic/  # StarDist / U-Net (MiDAP parity)             (planned)
-  meristem-trackers/        # Trackastra / ultrack / btrack / DeLTA       (planned)
-  meristem-napari/          # napari (npe2) interactive adapter           (planned)
+  meristem-models-cellpose/ # Cellpose-SAM + Omnipose backends (MiDAP's 4 bacterial models)
+  meristem-trackers/        # Trackastra + strack (native MiDAP S-track port)
+  meristem-napari/          # napari (npe2) interactive plugin
 ```
 
 ## Quickstart
 
 ```bash
-pip install -e packages/meristem-core        # dependency-light core + mock backends
+pip install -e packages/meristem-core        # dependency-light core + mock/strack backends
 meristem list                                # show installed segmentation & tracking backends
-meristem run experiment.yaml                 # run the pipeline from a YAML config
+meristem run experiment.yaml                 # segment + track + measure in one pass
 ```
 
 ```python
@@ -42,10 +42,19 @@ from meristem.core import run_pipeline, PipelineConfig
 results = run_pipeline(PipelineConfig.from_yaml("experiment.yaml"))
 ```
 
-## Status
+## Status — v1.0
 
-- **`meristem-core`** — complete: contracts, registry, pipeline (with a manual-crop ROI stage),
-  mock backends, CLI, and tests. Runs with zero ML dependencies.
-- **`meristem-models-cellpose`** — Cellpose-SAM and Omnipose segmentation backends.
+Complete and tested end-to-end on real *E. coli* monolayer movies:
 
-Trackers (Trackastra first) and the napari plugin are next. See the design plan for the roadmap.
+- **register → crop → segment → track → measure** pipeline, as one-shot (`run`) or modular stages
+  (`segment` → inspect → `track --frames`).
+- Segmentation: **Cellpose-SAM**, **Omnipose** (+ MiDAP's 4 bacterial models); Tracking:
+  **Trackastra**, **strack**. Swappable by name; `compare` mode to pick the best.
+- Drift registration (MiDAP-style crop-follow), manual crop, per-channel segment/track/measure
+  roles, size-filter cleanup, binary + instance masks.
+- Outputs: masks, tracks (napari + CTC), lineage graph, `measurements.csv` (per cell-frame),
+  `track_summary.csv` (per lineage: growth rate, division, intensity), `manifest.json`.
+- Interactive **napari** plugin over the same functions.
+
+See [docs/MANUAL.md](docs/MANUAL.md) for everything. Roadmap: ultrack/btrack/DeLTA trackers,
+micro-sam/StarDist segmenters, CTC tracking metrics, absolute frame numbering.

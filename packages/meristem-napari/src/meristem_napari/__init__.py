@@ -4,4 +4,4 @@ The GUI code (widgets, reader) imports napari/magicgui lazily; the napari-free h
 ``_core`` are importable and testable without a Qt stack.
 """
 
-__version__ = "0.0.1"
+__version__ = "1.0.0"

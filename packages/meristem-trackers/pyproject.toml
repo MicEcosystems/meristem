@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meristem-trackers"
-version = "0.0.1"
+version = "1.0.0"
 description = "Modern cell-tracking backends (Trackastra first) for the Meristem pipeline."
 readme = "README.md"
 requires-python = ">=3.9"

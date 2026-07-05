@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "meristem-models-cellpose"
-version = "0.0.1"
+version = "1.0.0"
 description = "Cellpose-SAM and Omnipose segmentation backends for the Meristem pipeline."
 readme = "README.md"
 requires-python = ">=3.9"
