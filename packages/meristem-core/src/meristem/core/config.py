@@ -117,7 +117,9 @@ class RegisterConfig(BaseModel):
 
     model_config = {"extra": "forbid"}
 
-    on: str  # channel used to estimate drift (e.g. "PH"); its shifts apply to every channel
+    # Channel used to estimate drift (e.g. "PH"); its shifts apply to every channel. (Named
+    # `channel`, not `on`, because `on` is a reserved boolean key in YAML.)
+    channel: str
     # "previous" accumulates frame-to-frame shifts; "first" aligns every frame to frame 0 (MiDAP's
     # choice). Default is "previous": in a growing monolayer the field decorrelates from frame 0, so
     # "first" tends to return ~0 drift on this kind of data, whereas consecutive frames stay similar.
@@ -161,9 +163,9 @@ class PipelineConfig(BaseModel):
     def _validate_register(self) -> "PipelineConfig":
         if self.registration is not None:
             names = {c.name for c in self.input.resolved_channels()}
-            if self.registration.on not in names:
+            if self.registration.channel not in names:
                 raise ValueError(
-                    f"register.on={self.registration.on!r} must name an input channel; "
+                    f"register.channel={self.registration.channel!r} must name an input channel; "
                     f"have {sorted(names)}"
                 )
         return self

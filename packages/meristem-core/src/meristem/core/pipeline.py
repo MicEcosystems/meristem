@@ -234,7 +234,7 @@ def _estimate_shifts(config: PipelineConfig, frames: Optional[range]) -> Optiona
     """Estimate drift shifts on the register-on channel (uncropped), or None if not configured."""
     if config.registration is None:
         return None
-    reg = next(c for c in config.input.resolved_channels() if c.name == config.registration.on)
+    reg = next(c for c in config.input.resolved_channels() if c.name == config.registration.channel)
     raw = read_image_stack(
         reg.path,
         name=reg.name,
@@ -245,7 +245,7 @@ def _estimate_shifts(config: PipelineConfig, frames: Optional[range]) -> Optiona
 
 
 def _drift_path(config: PipelineConfig, out_dir: Path) -> Path:
-    return out_dir / f"{config.registration.on}_drift.npy"
+    return out_dir / f"{config.registration.channel}_drift.npy"
 
 
 def _save_drift(config: PipelineConfig, shifts: Optional[np.ndarray]) -> None:

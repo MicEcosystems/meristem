@@ -87,7 +87,7 @@ def test_registration_applied_before_crop_in_pipeline(tmp_path):
     out = tmp_path / "out"
     cfg = PipelineConfig(
         input={"path": str(p), "name": "PH"},
-        register={"on": "PH", "reference": "previous"},
+        register={"channel": "PH", "reference": "previous"},
         crop={"y": 28, "x": 28, "height": 24, "width": 24},  # tight box around the (registered) cell
         segmenter=BackendConfig(name="mock", params={"threshold": 0.5}),
         tracker=BackendConfig(name="strack"),
@@ -102,10 +102,10 @@ def test_registration_applied_before_crop_in_pipeline(tmp_path):
 
 
 def test_register_on_must_be_a_channel(tmp_path):
-    with pytest.raises(Exception, match="register.on"):
+    with pytest.raises(Exception, match="register.channel"):
         PipelineConfig(
             input={"path": "x.tif", "name": "PH"},
-            register={"on": "GFP"},  # not a channel in a single-path input (named PH)
+            register={"channel": "GFP"},  # not a channel in a single-path input (named PH)
             segmenter=BackendConfig(name="mock"),
             tracker=BackendConfig(name="mock"),
         )
