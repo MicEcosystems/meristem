@@ -21,7 +21,7 @@ import numpy as np
 import tifffile
 
 from .contracts import ImageStack, SegMasks, TrackGraph
-from .measure import MeasurementTable
+from .measure import MeasurementTable, TrackSummaryTable
 
 
 def read_image_stack(
@@ -83,7 +83,8 @@ class ResultBundle:
     channels: List[ChannelResult]
     segmenter: str
     tracker: str
-    measurements: Optional[MeasurementTable] = None  # per-cell intensities of `measure` channels
+    measurements: Optional[MeasurementTable] = None  # per cell-frame (long format)
+    track_summary: Optional[TrackSummaryTable] = None  # one row per track (lineage summary)
 
     def channel(self, name: str) -> ChannelResult:
         for ch in self.channels:
@@ -118,6 +119,13 @@ class ResultBundle:
                 "file": csv_path.name,
                 "channels": self.measurements.channels,
                 "n_rows": len(self.measurements.rows),
+            }
+        if self.track_summary is not None:
+            summary_path = out / "track_summary.csv"
+            self.track_summary.to_csv(summary_path)
+            manifest["track_summary"] = {
+                "file": summary_path.name,
+                "n_tracks": len(self.track_summary.rows),
             }
         manifest_path = out / "manifest.json"
         with open(manifest_path, "w") as fh:

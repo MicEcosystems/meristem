@@ -19,7 +19,7 @@ import numpy as np
 from .config import BackendConfig, ChannelConfig, PipelineConfig
 from .contracts import ImageStack, SegMasks, TrackGraph
 from .io import ChannelResult, ResultBundle, read_image_stack, read_masks
-from .measure import MeasurementTable, measure_intensities
+from .measure import MeasurementTable, TrackSummaryTable, measure_intensities, summarize_tracks
 from .postprocess import filter_by_size
 from .register import apply_shifts, crop_with_drift, estimate_drift
 from .registry import get_segmenter, get_tracker
@@ -56,6 +56,7 @@ def run_pipeline(config: PipelineConfig, *, save: bool = True) -> ResultBundle:
         segmenter=config.segmenter.name,
         tracker=config.tracker.name,
         measurements=measurements,
+        track_summary=_summarize(config, result_by_name, measurements),
     )
     if save:
         _save_drift(config, shifts)
@@ -134,6 +135,7 @@ def run_tracking(
         segmenter=config.segmenter.name,
         tracker=config.tracker.name,
         measurements=measurements,
+        track_summary=_summarize(config, result_by_name, measurements),
     )
     if save:
         # Masks already exist from the segment stage (and may be a full-length superset of this
@@ -198,6 +200,20 @@ def _measure_channels(
     }
     return measure_intensities(
         base.masks, channel_images, tracks=base.tracks, pixel_size_um=config.input.pixel_size_um
+    )
+
+
+def _summarize(
+    config: PipelineConfig, result_by_name: dict, measurements: Optional[MeasurementTable]
+) -> Optional[TrackSummaryTable]:
+    """Collapse the per-cell measurements into one row per track (needs measurements + tracks)."""
+    if measurements is None:
+        return None
+    base = result_by_name.get(config.measure_on)
+    if base is None or base.tracks is None:
+        return None
+    return summarize_tracks(
+        measurements, base.tracks, frame_interval_s=config.input.frame_interval_s
     )
 
 

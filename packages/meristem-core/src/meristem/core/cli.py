@@ -95,6 +95,8 @@ def _cmd_track(config_path: Path, masks_dir: Optional[str], frames: Optional[str
     if bundle.measurements is not None:
         m = bundle.measurements
         print(f"  measured {', '.join(m.channels)} over {len(m.rows)} cell-frames")
+    if bundle.track_summary is not None:
+        print(f"  summarized {len(bundle.track_summary.rows)} tracks")
     if save:
         print(f"Results written to: {config.output.dir}")
     return 0

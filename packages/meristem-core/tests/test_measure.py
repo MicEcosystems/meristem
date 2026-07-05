@@ -99,6 +99,40 @@ def test_pipeline_measures_gfp_through_ph_and_writes_csv(tmp_path, dividing_stac
     assert rows and {"frame", "label", "track_id", "GFP_mean", "GFP_total"} <= set(rows[0])
 
 
+def test_track_summary_one_row_per_track(tmp_path, dividing_stack: ImageStack):
+    import json
+
+    ph = tmp_path / "PH.tif"
+    gfp = tmp_path / "GFP.tif"
+    tifffile.imwrite(str(ph), dividing_stack.data)
+    tifffile.imwrite(str(gfp), (dividing_stack.data * 400).astype(np.uint16))
+    out_dir = tmp_path / "out"
+
+    from meristem.core import run_pipeline
+
+    cfg = _mock_multichannel_cfg(ph, gfp, out_dir)
+    # frame_interval_s enables a growth rate; add it to the input.
+    cfg = cfg.model_copy(update={"input": cfg.input.model_copy(update={"frame_interval_s": 300.0})})
+    bundle = run_pipeline(cfg, save=True)
+
+    assert bundle.track_summary is not None
+    summary_path = out_dir / "track_summary.csv"
+    assert summary_path.exists()
+    rows = list(csv.DictReader(open(summary_path)))
+    # One row per distinct tracked cell, and the columns include lineage + aggregates.
+    assert rows
+    cols = set(rows[0])
+    assert {"track_id", "parent", "n_frames", "divides", "area_mean_px", "GFP_mean"} <= cols
+    # Track ids are unique (one row per track).
+    ids = [r["track_id"] for r in rows]
+    assert len(ids) == len(set(ids))
+    # The mother lineage that divides should be flagged somewhere.
+    assert any(r["divides"] == "1" for r in rows)
+
+    manifest = json.loads((out_dir / "manifest.json").read_text())
+    assert manifest["track_summary"]["n_tracks"] == len(rows)
+
+
 def test_measure_requires_measure_on(tmp_path):
     # A measure channel without measure_on must be rejected at config time.
     with pytest.raises(Exception, match="measure_on"):

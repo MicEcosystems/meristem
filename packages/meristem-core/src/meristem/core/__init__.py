@@ -18,7 +18,13 @@ from .config import (
 )
 from .contracts import ImageStack, ROI, SegMasks, TrackGraph
 from .io import ChannelResult, ResultBundle, read_image_stack
-from .measure import CellMeasurement, MeasurementTable, measure_intensities
+from .measure import (
+    CellMeasurement,
+    MeasurementTable,
+    TrackSummaryTable,
+    measure_intensities,
+    summarize_tracks,
+)
 from .postprocess import filter_by_size
 from .register import apply_shifts, crop_with_drift, estimate_drift
 from .pipeline import (
@@ -70,6 +76,8 @@ __all__ = [
     "measure_intensities",
     "MeasurementTable",
     "CellMeasurement",
+    "summarize_tracks",
+    "TrackSummaryTable",
     # pipeline
     "run_pipeline",
     "run_segmentation",
