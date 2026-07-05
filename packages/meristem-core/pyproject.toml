@@ -9,7 +9,7 @@ description = "Modular, model-agnostic core for segmenting and tracking bacteria
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "BSD-3-Clause" }
-authors = [{ name = "meristem contributors" }]
+authors = [{ name = "Glen D'souza", email = "glen.dsouza@asu.edu" }, { name = "Microbial Ecosystems Lab, Arizona State University" }]
 keywords = ["microscopy", "segmentation", "cell-tracking", "bacteria", "microfluidics"]
 classifiers = [
     "Development Status :: 4 - Beta",

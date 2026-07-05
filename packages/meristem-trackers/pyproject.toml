@@ -9,7 +9,7 @@ description = "Modern cell-tracking backends (Trackastra first) for the Meristem
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "BSD-3-Clause" }
-authors = [{ name = "meristem contributors" }]
+authors = [{ name = "Glen D'souza", email = "glen.dsouza@asu.edu" }, { name = "Microbial Ecosystems Lab, Arizona State University" }]
 keywords = ["cell-tracking", "lineage", "trackastra", "bacteria", "microscopy"]
 dependencies = [
     "meristem-core",

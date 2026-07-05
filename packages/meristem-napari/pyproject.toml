@@ -9,7 +9,7 @@ description = "napari plugin for the Meristem pipeline: crop, segment, inspect, 
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "BSD-3-Clause" }
-authors = [{ name = "meristem contributors" }]
+authors = [{ name = "Glen D'souza", email = "glen.dsouza@asu.edu" }, { name = "Microbial Ecosystems Lab, Arizona State University" }]
 keywords = ["napari", "segmentation", "cell-tracking", "bacteria"]
 classifiers = ["Framework :: napari"]
 dependencies = [

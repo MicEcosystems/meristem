@@ -1,5 +1,8 @@
 # Meristem
 
+[![tests](https://github.com/MicEcosystems/meristem/actions/workflows/tests.yml/badge.svg)](https://github.com/MicEcosystems/meristem/actions/workflows/tests.yml)
+[![license](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+
 > A next-generation, modular pipeline for **segmenting and tracking bacterial cells growing as
 > 2D monolayers in microfluidic devices**.
 
@@ -58,3 +61,12 @@ Complete and tested end-to-end on real *E. coli* monolayer movies:
 
 See [docs/MANUAL.md](docs/MANUAL.md) for everything. Roadmap: ultrack/btrack/DeLTA trackers,
 micro-sam/StarDist segmenters, CTC tracking metrics, absolute frame numbering.
+
+## Credits
+
+Co-created with the **[Microbial Ecosystems Lab](https://github.com/MicEcosystems) at Arizona State
+University** (Glen D'souza). A modular successor to
+[MiDAP](https://github.com/Microbial-Systems-Ecology/midap). BSD-3-Clause licensed — see
+[LICENSE](LICENSE).
+
+If you use Meristem in your research, please cite this repository and the Microbial Ecosystems Lab.
