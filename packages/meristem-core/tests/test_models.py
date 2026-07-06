@@ -36,6 +36,15 @@ def test_resolve_weights_local_path(tmp_path):
         resolve_weights(ModelSpec(name="m", backend="omnipose", path=str(tmp_path / "nope")))
 
 
+def test_builtin_midap_models_offered():
+    from meristem.core.models import builtin_model_specs
+
+    names = {s.name for s in builtin_model_specs()}
+    assert names == {"midap_omni_phase_v01", "midap_omni_fluor_v01"}
+    for s in builtin_model_specs():
+        assert s.backend == "omnipose" and s.url and "releases/download" in s.url
+
+
 def test_custom_model_registers_and_wraps_backend(tmp_path, monkeypatch):
     # A custom model backed by the (dependency-free) mock segmenter, so the whole path is testable.
     weights = tmp_path / "our_weights"

@@ -36,6 +36,23 @@ MERISTEM_HOME = Path.home() / ".meristem"
 MODELS_YAML = MERISTEM_HOME / "models.yaml"
 CACHE_DIR = MERISTEM_HOME / "cache"
 
+# Models shipped as defaults: MiDAP's custom Omnipose models, hosted as release assets on the
+# Meristem repo (~27 MB each). They're always offered by name; the weights download lazily on first
+# use. A user's ~/.meristem/models.yaml entry with the same name overrides these (e.g. to point at a
+# local copy instead of downloading).
+_RELEASE_BASE = "https://github.com/MicEcosystems/meristem/releases/download/models-v1"
+_BUILTIN_MODELS = [
+    {"name": "midap_omni_phase_v01", "backend": "omnipose",
+     "url": f"{_RELEASE_BASE}/midap_omni_phase_v01", "version": "v01"},
+    {"name": "midap_omni_fluor_v01", "backend": "omnipose",
+     "url": f"{_RELEASE_BASE}/midap_omni_fluor_v01", "version": "v01"},
+]
+
+
+def builtin_model_specs() -> "List[ModelSpec]":
+    """The default MiDAP Omnipose models, offered out of the box (downloaded on first use)."""
+    return [ModelSpec.model_validate(m) for m in _BUILTIN_MODELS]
+
 
 class ModelSpec(BaseModel):
     """One named custom model: a backend + a weights source (local path or URL)."""

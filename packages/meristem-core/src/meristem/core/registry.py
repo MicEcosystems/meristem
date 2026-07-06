@@ -99,10 +99,14 @@ def discover_plugins(force: bool = False) -> None:
 
 def _register_custom_models() -> None:
     """Register each model in ~/.meristem/models.yaml as a named segmenter wrapping its backend."""
-    from .models import load_model_specs, resolve_weights
+    from .models import builtin_model_specs, load_model_specs, resolve_weights
 
     try:
-        specs = load_model_specs()
+        # Shipped defaults first; a user's models.yaml entry with the same name overrides them.
+        by_name = {s.name: s for s in builtin_model_specs()}
+        for s in load_model_specs():
+            by_name[s.name] = s
+        specs = list(by_name.values())
     except Exception as exc:  # a malformed models.yaml must not break discovery
         import warnings
 
