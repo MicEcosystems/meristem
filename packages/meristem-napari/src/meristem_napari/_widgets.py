@@ -11,7 +11,14 @@ from __future__ import annotations
 
 import napari
 from magicgui import magic_factory
-from magicgui.widgets import CheckBox, ComboBox, Container, PushButton, create_widget
+from magicgui.widgets import (
+    CheckBox,
+    ComboBox,
+    Container,
+    FloatSpinBox,
+    PushButton,
+    create_widget,
+)
 
 from ._core import (
     segment_and_track_to_layers,
@@ -22,6 +29,26 @@ from ._core import (
 )
 
 CROP_LAYER = "crop"  # the Shapes layer the crop rectangle lives on
+
+
+def _add_crop_box() -> None:
+    """Create (or reuse) a rectangle Shapes layer in draw mode — the one-click crop."""
+    v = napari.current_viewer()
+    if v is None:
+        return
+    layer = v.layers[CROP_LAYER] if CROP_LAYER in v.layers else v.add_shapes(
+        name=CROP_LAYER, edge_color="yellow", edge_width=3, face_color="transparent"
+    )
+    v.layers.selection.active = layer
+    layer.mode = "add_rectangle"  # user just drags a box; no mode-hunting
+
+
+def _read_crop_rect():
+    """Return the first rectangle drawn on the crop layer, or None."""
+    v = napari.current_viewer()
+    if v is not None and CROP_LAYER in v.layers and len(v.layers[CROP_LAYER].data):
+        return v.layers[CROP_LAYER].data[0]
+    return None
 
 
 def run_widget():
@@ -40,63 +67,53 @@ def run_widget():
     run = PushButton(text="Run  ▶")
     panel = Container(widgets=[image, segmenter, tracker, device, register, add_crop, run])
 
-    def _viewer():
-        return napari.current_viewer()
-
-    def _on_add_crop():
-        v = _viewer()
-        if v is None:
-            return
-        layer = v.layers[CROP_LAYER] if CROP_LAYER in v.layers else v.add_shapes(
-            name=CROP_LAYER, edge_color="yellow", edge_width=3, face_color="transparent"
-        )
-        v.layers.selection.active = layer
-        layer.mode = "add_rectangle"  # user just drags a box; no mode-hunting
-
     def _on_run():
-        v = _viewer()
+        v = napari.current_viewer()
         img = image.value
         if img is None:
             return
-        crop_rect = None
-        if v is not None and CROP_LAYER in v.layers and len(v.layers[CROP_LAYER].data):
-            crop_rect = v.layers[CROP_LAYER].data[0]  # first rectangle drawn
         layers = segment_and_track_to_layers(
             img.data, img.name, segmenter.value, tracker.value,
-            device=device.value, crop_rect=crop_rect, register=register.value,
+            device=device.value, crop_rect=_read_crop_rect(), register=register.value,
         )
         if v is not None:
             for data, meta, ltype in layers:
                 getattr(v, f"add_{ltype}")(data, **meta)
 
-    add_crop.clicked.connect(_on_add_crop)
+    add_crop.clicked.connect(_add_crop_box)
     run.clicked.connect(_on_run)
     return panel
 
 
-@magic_factory(
-    call_button="Segment",
-    segmenter={"choices": segmenter_choices},
-    device={"choices": ["auto", "cpu", "cuda", "mps"]},
-    min_size_frac={"label": "size filter (frac of mean, 0=off)", "min": 0.0, "step": 0.01},
-)
-def segment_widget(
-    image: "napari.layers.Image",
-    segmenter: str = "cellpose-sam",
-    device: str = "auto",
-    min_size_frac: float = 0.0,
-    crop: "napari.layers.Shapes" = None,
-) -> "napari.types.LayerDataTuple":
-    """Segment ``image`` (optionally cropped to the first rectangle in ``crop``) and add masks."""
-    crop_rect = crop.data[0] if (crop is not None and len(crop.data)) else None
-    return segment_to_layer(
-        image.data,
-        image.name,
-        segmenter,
-        device=device,
-        min_size_frac=min_size_frac,
-        crop_rect=crop_rect,
-    )
+def segment_widget():
+    """Stage 1 (Container): pick a model, add a crop box, Segment — masks appear as a Labels layer.
+
+    Same one-click crop as the Run panel: **Add crop box** creates a rectangle to drag on the PH
+    image; no manual Shapes-layer setup.
+    """
+    image = create_widget(annotation="napari.layers.Image", label="Image")
+    segmenter = ComboBox(choices=segmenter_choices, label="Segmentation model", value="cellpose-sam")
+    device = ComboBox(choices=["auto", "cpu", "cuda", "mps"], label="Device", value="auto")
+    min_size = FloatSpinBox(value=0.0, min=0.0, step=0.01, label="size filter (frac of mean, 0=off)")
+    add_crop = PushButton(text="✏  Add crop box")
+    segment = PushButton(text="Segment")
+    panel = Container(widgets=[image, segmenter, device, min_size, add_crop, segment])
+
+    def _on_segment():
+        v = napari.current_viewer()
+        img = image.value
+        if img is None:
+            return
+        data, meta, ltype = segment_to_layer(
+            img.data, img.name, segmenter.value,
+            device=device.value, min_size_frac=min_size.value, crop_rect=_read_crop_rect(),
+        )
+        if v is not None:
+            getattr(v, f"add_{ltype}")(data, **meta)
+
+    add_crop.clicked.connect(_add_crop_box)
+    segment.clicked.connect(_on_segment)
+    return panel
 
 
 @magic_factory(
