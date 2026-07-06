@@ -92,7 +92,45 @@ def discover_plugins(force: bool = False) -> None:
                 continue
             # Entry-point name is authoritative even if the class wasn't decorated.
             register(ep.name)(cls)
+    # Set before registering custom models so any get_* calls they make don't re-enter discovery.
     _entry_points_loaded = True
+    _register_custom_models()
+
+
+def _register_custom_models() -> None:
+    """Register each model in ~/.meristem/models.yaml as a named segmenter wrapping its backend."""
+    from .models import load_model_specs, resolve_weights
+
+    try:
+        specs = load_model_specs()
+    except Exception as exc:  # a malformed models.yaml must not break discovery
+        import warnings
+
+        warnings.warn(f"could not load custom models: {exc}")
+        return
+
+    for spec in specs:
+        base = _segmenters.get(spec.backend)  # direct dict access avoids re-entering discovery
+        if base is None or spec.name in _segmenters:
+            continue  # backend not installed, or the name is already taken
+        _segmenters[spec.name] = _bind_custom_model(base, spec, resolve_weights)
+
+
+def _bind_custom_model(base_cls, spec, resolve_weights):
+    """Subclass a backend so it loads a specific weights source, exposed under the model's name."""
+
+    class _CustomModel(base_cls):  # type: ignore[valid-type, misc]
+        _spec = spec
+
+        def load(self, params):
+            weights = str(resolve_weights(self._spec))
+            if "model_path" in type(params).model_fields:
+                params = params.model_copy(update={"model_path": weights})
+            super().load(params)
+
+    _CustomModel.__name__ = "Custom_" + spec.name.replace("-", "_")
+    _CustomModel.name = spec.name
+    return _CustomModel
 
 
 def _iter_entry_points(group: str):

@@ -25,6 +25,7 @@ from .measure import (
     measure_intensities,
     summarize_tracks,
 )
+from .models import ModelSpec, load_model_specs, resolve_weights
 from .postprocess import filter_by_size
 from .register import apply_shifts, crop_with_drift, estimate_drift
 from .pipeline import (
@@ -78,6 +79,10 @@ __all__ = [
     "CellMeasurement",
     "summarize_tracks",
     "TrackSummaryTable",
+    # custom models
+    "ModelSpec",
+    "load_model_specs",
+    "resolve_weights",
     # pipeline
     "run_pipeline",
     "run_segmentation",
