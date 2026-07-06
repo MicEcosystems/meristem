@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import napari
 from magicgui import magic_factory
+from magicgui.widgets import CheckBox, ComboBox, Container, PushButton, create_widget
 
 from ._core import (
     segment_and_track_to_layers,
@@ -20,31 +21,57 @@ from ._core import (
     tracker_choices,
 )
 
+CROP_LAYER = "crop"  # the Shapes layer the crop rectangle lives on
 
-@magic_factory(
-    call_button="Run  ▶",
-    segmenter={"choices": segmenter_choices, "label": "Segmentation model"},
-    tracker={"choices": tracker_choices, "label": "Tracker"},
-    device={"choices": ["auto", "cpu", "cuda", "mps"]},
-    register={"label": "correct drift"},
-)
-def run_widget(
-    image: "napari.layers.Image",
-    segmenter: str = "cellpose-sam",
-    tracker: str = "strack",
-    device: str = "auto",
-    register: bool = True,
-    crop: "napari.layers.Shapes" = None,
-) -> "napari.types.LayerDataTuple":
-    """One-click: pick a segmenter and tracker, press Run. Adds masks + tracks layers.
 
-    This is the guided, no-YAML entry point — the MiDAP-style "the dropdowns do the rest".
+def run_widget():
+    """The guided, no-YAML panel: pick a segmenter + tracker, optionally add a crop box, press Run.
+
+    Built as a Container (not a simple form) so it can carry an **Add crop box** button that creates
+    a rectangle Shapes layer in draw mode for you — no manual layer juggling. The crop is read from
+    that ``crop`` layer automatically on Run.
     """
-    crop_rect = crop.data[0] if (crop is not None and len(crop.data)) else None
-    return segment_and_track_to_layers(
-        image.data, image.name, segmenter, tracker,
-        device=device, crop_rect=crop_rect, register=register,
-    )
+    image = create_widget(annotation="napari.layers.Image", label="Image")
+    segmenter = ComboBox(choices=segmenter_choices, label="Segmentation model", value="cellpose-sam")
+    tracker = ComboBox(choices=tracker_choices, label="Tracker", value="strack")
+    device = ComboBox(choices=["auto", "cpu", "cuda", "mps"], label="Device", value="auto")
+    register = CheckBox(value=True, text="correct drift")
+    add_crop = PushButton(text="✏  Add crop box")
+    run = PushButton(text="Run  ▶")
+    panel = Container(widgets=[image, segmenter, tracker, device, register, add_crop, run])
+
+    def _viewer():
+        return napari.current_viewer()
+
+    def _on_add_crop():
+        v = _viewer()
+        if v is None:
+            return
+        layer = v.layers[CROP_LAYER] if CROP_LAYER in v.layers else v.add_shapes(
+            name=CROP_LAYER, edge_color="yellow", edge_width=3, face_color="transparent"
+        )
+        v.layers.selection.active = layer
+        layer.mode = "add_rectangle"  # user just drags a box; no mode-hunting
+
+    def _on_run():
+        v = _viewer()
+        img = image.value
+        if img is None:
+            return
+        crop_rect = None
+        if v is not None and CROP_LAYER in v.layers and len(v.layers[CROP_LAYER].data):
+            crop_rect = v.layers[CROP_LAYER].data[0]  # first rectangle drawn
+        layers = segment_and_track_to_layers(
+            img.data, img.name, segmenter.value, tracker.value,
+            device=device.value, crop_rect=crop_rect, register=register.value,
+        )
+        if v is not None:
+            for data, meta, ltype in layers:
+                getattr(v, f"add_{ltype}")(data, **meta)
+
+    add_crop.clicked.connect(_on_add_crop)
+    run.clicked.connect(_on_run)
+    return panel
 
 
 @magic_factory(

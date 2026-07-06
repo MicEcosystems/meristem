@@ -249,8 +249,10 @@ the shared crop/register/segmenter/tracker settings apply to every position.
 napari         # Plugins → Meristem
 ```
 
-- **1. Segment** — drop a channel TIFF in, pick a backend from the dropdown, optionally draw a
-  rectangle on a Shapes layer for the crop, run. Masks appear as a Labels layer to inspect.
+- **Run pipeline** — the one-click panel: pick the image, a segmentation model, and a tracker;
+  click **✏ Add crop box** (it creates a rectangle layer in draw mode — just drag a box on the PH
+  image), then **Run ▶**. Masks + tracks are added as layers. No manual layer setup.
+- **1. Segment** — segment only, into a Labels layer to inspect.
 - **2. Track + measure** — pick a tracker and a frame window; the lineage appears as a Tracks layer.
 
 The widgets call the same `meristem.core` functions as the CLI, so results match.
