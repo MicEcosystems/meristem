@@ -57,16 +57,15 @@ class ChannelConfig(BaseModel):
     segment: bool = True
     track: bool = False  # opt-in; the single-channel shorthand sets this True explicitly
     measure: bool = False  # read out per-cell intensity (via the PipelineConfig.measure_on masks)
+    # A channel may have no role at all: then it is a *reference* channel — loaded so it can drive
+    # drift registration (register.channel) and the crop is drawn on it, but not itself segmented or
+    # measured. This is the common case for phase contrast when a fluorescence channel is segmented.
 
     @model_validator(mode="after")
     def _validate_roles(self) -> "ChannelConfig":
         if self.track and not self.segment:
             raise ValueError(
                 f"channel {self.name!r}: track=True requires segment=True (cannot track without masks)"
-            )
-        if not (self.segment or self.measure):
-            raise ValueError(
-                f"channel {self.name!r}: must have at least one role (segment or measure)"
             )
         return self
 
@@ -167,6 +166,20 @@ class PipelineConfig(BaseModel):
                 raise ValueError(
                     f"register.channel={self.registration.channel!r} must name an input channel; "
                     f"have {sorted(names)}"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_channel_usage(self) -> "PipelineConfig":
+        # A role-less channel is only meaningful as the registration reference (e.g. PH used to
+        # correct drift and draw the crop while a fluorescence channel is segmented). Otherwise it
+        # would be loaded and ignored — almost always a mistake.
+        ref = self.registration.channel if self.registration is not None else None
+        for c in self.input.resolved_channels():
+            if not (c.segment or c.measure or c.name == ref):
+                raise ValueError(
+                    f"channel {c.name!r} has no role: set segment/measure, or make it the "
+                    f"register channel (a reference-only channel must drive registration)"
                 )
         return self
 

@@ -161,6 +161,46 @@ def test_track_requires_segment_is_rejected():
         )
 
 
+def test_reference_only_ph_channel(tmp_path, dividing_stack: ImageStack):
+    # PH has no segment/measure role — it exists only to drive drift registration (and, in the GUI,
+    # to draw the crop on) while GFP is the segmented+tracked channel.
+    import tifffile
+
+    ph, gfp = tmp_path / "PH.tif", tmp_path / "GFP.tif"
+    tifffile.imwrite(str(ph), dividing_stack.data)
+    tifffile.imwrite(str(gfp), dividing_stack.data)
+    out = tmp_path / "out"
+    cfg = _mock_config(
+        input={
+            "channels": [
+                {"name": "PH", "path": str(ph), "segment": False},  # reference only
+                {"name": "GFP", "path": str(gfp), "segment": True, "track": True},
+            ],
+            "pixel_size_um": 0.065,
+        },
+        register={"channel": "PH"},
+        output={"dir": str(out)},
+    )
+    bundle = run_pipeline(cfg, save=True)
+    assert [c.name for c in bundle.channels] == ["GFP"]  # only GFP is segmented
+    assert bundle.channel("GFP").tracked
+    assert (out / "PH_drift.npy").exists()  # PH drove registration
+
+
+def test_roleless_channel_without_register_is_rejected():
+    import pytest
+
+    with pytest.raises(Exception, match="no role"):
+        _mock_config(
+            input={
+                "channels": [
+                    {"name": "PH", "path": "ph.tif", "segment": False},  # no role, not a register channel
+                    {"name": "GFP", "path": "gfp.tif", "segment": True},
+                ]
+            }
+        )
+
+
 def test_read_image_stack_promotes_2d(tmp_path):
     import tifffile
 
