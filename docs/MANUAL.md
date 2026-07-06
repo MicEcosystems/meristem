@@ -183,6 +183,7 @@ overwrites the masks. Drift shifts saved by `segment` are reused so alignment ma
 | `meristem segment <cfg>` | Stage 1: segment only, write masks |
 | `meristem track <cfg> [--frames A:B] [--masks-dir DIR]` | Stage 2: track saved masks |
 | `meristem compare <spec>` | Run several models on the same input and tabulate them |
+| `meristem batch <spec>` | Run the pipeline across every position in a folder |
 
 `--no-save` skips writing files (any command).
 
@@ -214,6 +215,33 @@ A PH-only run (no fluorescence) still produces `measurements.csv` (areas) and `t
 (growth/lineage) — intensity columns are simply absent.
 
 ---
+
+## 6a. Batch processing (many positions)
+
+Process a whole folder of positions with one spec. Files are matched by a pattern with `{pos}` and
+`{channel}` tokens; each complete position (one file per channel) runs into its own subfolder.
+
+```yaml
+# batch.yaml
+folder: /data/experiment1
+pattern: "Timelapse_pos{pos}_{channel}.tif"
+channels:
+  - {name: PH,  segment: false}            # reference (crop + drift), not segmented here
+  - {name: GFP, segment: true, track: true}
+  - {name: RFP, match: TxRed, measure: true}   # `match` when the file token differs from the name
+register: {channel: PH}
+segmenter: {name: midap_omni_phase_v01}
+tracker:   {name: strack}
+measure_on: PH
+output_dir: results          # -> results/pos4/, results/pos5/, ...
+```
+
+```bash
+meristem batch batch.yaml     # discovers positions and runs each; per-position output folders
+```
+
+Positions can also be listed explicitly (`positions: ["4", "5"]`). One position failing raises;
+the shared crop/register/segmenter/tracker settings apply to every position.
 
 ## 7. napari plugin
 

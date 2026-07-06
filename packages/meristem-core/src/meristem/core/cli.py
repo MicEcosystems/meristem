@@ -49,6 +49,10 @@ def main(argv: list[str] | None = None) -> int:
     cmp_p = sub.add_parser("compare", help="compare several models on the same input")
     cmp_p.add_argument("spec", type=Path, help="path to the comparison YAML spec")
 
+    batch_p = sub.add_parser("batch", help="run the pipeline across many positions")
+    batch_p.add_argument("spec", type=Path, help="path to the batch YAML spec")
+    batch_p.add_argument("--no-save", action="store_true", help="do not write result files")
+
     args = parser.parse_args(argv)
 
     if args.command == "list":
@@ -61,6 +65,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_track(args.config, args.masks_dir, args.frames, save=not args.no_save)
     if args.command == "compare":
         return _cmd_compare(args.spec)
+    if args.command == "batch":
+        return _cmd_batch(args.spec, save=not args.no_save)
     parser.error(f"unknown command {args.command!r}")
     return 2
 
@@ -68,6 +74,25 @@ def main(argv: list[str] | None = None) -> int:
 def _cmd_compare(spec_path: Path) -> int:
     report = run_comparison(CompareSpec.from_yaml(spec_path))
     print(format_report(report))
+    return 0
+
+
+def _cmd_batch(spec_path: Path, *, save: bool) -> int:
+    from .batch import BatchSpec, discover_positions, run_batch
+
+    spec = BatchSpec.from_yaml(spec_path)
+    positions = spec.positions or discover_positions(spec)
+    if not positions:
+        print("No positions found — check `folder` and `pattern` in the spec.")
+        return 1
+    print(f"Found {len(positions)} position(s): {', '.join(positions)}")
+    results = run_batch(spec, save=save, positions=positions)
+    for pos, bundle in results.items():
+        tracked = [c for c in bundle.channels if c.tracked]
+        det = sum(c.tracks.n_detections for c in tracked)
+        print(f"  pos{pos}: {len(bundle.channels)} segmented channel(s), {det} detections")
+    if save:
+        print(f"Results written under: {spec.output_dir}/")
     return 0
 
 

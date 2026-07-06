@@ -6,6 +6,7 @@ class from application code.
 
 from __future__ import annotations
 
+from .batch import BatchSpec, discover_positions, run_batch
 from .compare import ComparisonReport, CompareSpec, format_report, run_comparison
 from .config import (
     BackendConfig,
@@ -95,6 +96,10 @@ __all__ = [
     "ComparisonReport",
     "run_comparison",
     "format_report",
+    # batch
+    "BatchSpec",
+    "run_batch",
+    "discover_positions",
     # registry
     "register_segmenter",
     "register_tracker",
