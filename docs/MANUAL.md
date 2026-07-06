@@ -243,6 +243,29 @@ The widgets call the same `meristem.core` functions as the CLI, so results match
 - `strack` — native port of MiDAP's S-track (overlap + distance + division-angle validation).
 - `mock` — greedy overlap baseline.
 
+### Custom / trained models (MiDAP's Omnipose models)
+
+Trained model weights (e.g. MiDAP's Omnipose models trained on lab data) become selectable by name
+via `~/.meristem/models.yaml` — each entry wraps an installed backend with your weights and appears
+in `meristem list` and the napari dropdown:
+
+```yaml
+# ~/.meristem/models.yaml
+models:
+  - name: midap_omni_phase_v01          # -> selectable as this segmenter
+    backend: omnipose
+    path: ~/.meristem/models/midap_omni_phase_v01     # a local weights file
+  - name: our_phase_v2
+    backend: omnipose
+    url: https://your-host/our_phase_v2               # downloaded + cached on first use
+    version: v2                                        # bump to force re-download
+```
+
+An entry can also point `url` at a **zip** with `subpath: <member>` to extract one file. MiDAP's
+models live in a 3 GB bundle on ETH polybox where the two Omnipose models are only ~27 MB each; the
+lighter option is to host those two files individually and point `url` at them. Weights are
+downloaded lazily (only when the model is actually run) and cached under `~/.meristem/cache`.
+
 **Choosing between them** — `meristem compare` runs several on the same input:
 
 ```yaml
